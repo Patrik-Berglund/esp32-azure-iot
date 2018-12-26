@@ -132,6 +132,6 @@ void app_main()
 
     // xTaskCreate(&azure_task, "azure_task", 1024 * 5, NULL, 5, NULL);
     // xTaskCreate(&heapPoll, "heapPoll", 4096, NULL, 0, NULL);
-    xTaskCreatePinnedToCore(&azure_task, "azure_task", 1024 * 5, NULL, 5, NULL, 0);
-    xTaskCreatePinnedToCore(&heapPoll, "heapPoll", 1024 * 5, NULL, 0, NULL, 0);
+    xTaskCreatePinnedToCore(&azure_task, "azure_task", 1024 * 5, NULL, 5, NULL, 1);
+    xTaskCreatePinnedToCore(&heapPoll, "heapPoll", 1024 * 5, NULL, 0, NULL, 1);
 }
