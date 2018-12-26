@@ -5,7 +5,6 @@
 #include <stdlib.h>
 
 #include "iothub_client_ll.h"
-#include "iothub_device_client_ll.h"
 #include "iothub_client_options.h"
 #include "iothub_message.h"
 #include "azure_c_shared_utility/threadapi.h"
