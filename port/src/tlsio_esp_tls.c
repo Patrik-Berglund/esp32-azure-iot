@@ -2,7 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 // This component was written to conform to the tlsio_requirements.md specification located
-// in the Azure IoT C Utility: 
+// in the Azure IoT C Utility:
 // https://github.com/Azure/azure-c-shared-utility/blob/master/devdoc/tlsio_requirements.md
 // Comments throughout this code refer to requirements in that spec.
 
@@ -23,11 +23,11 @@
 
 typedef struct
 {
-    unsigned char* bytes;
+    unsigned char *bytes;
     size_t size;
     size_t unsent_size;
     ON_SEND_COMPLETE on_send_complete;
-    void* callback_context;
+    void *callback_context;
 } PENDING_TRANSMISSION;
 
 #define MAX_VALID_PORT 0xffff
@@ -35,7 +35,6 @@ typedef struct
 // The TLSIO_RECEIVE_BUFFER_SIZE has very little effect on performance, and is kept small
 // to minimize memory consumption.
 #define TLSIO_RECEIVE_BUFFER_SIZE 64
-
 
 typedef enum TLSIO_STATE_TAG
 {
@@ -56,20 +55,20 @@ typedef struct TLS_IO_INSTANCE_TAG
     ON_BYTES_RECEIVED on_bytes_received;
     ON_IO_ERROR on_io_error;
     ON_IO_OPEN_COMPLETE on_open_complete;
-    void* on_bytes_received_context;
-    void* on_io_error_context;
-    void* on_open_complete_context;
+    void *on_bytes_received_context;
+    void *on_io_error_context;
+    void *on_open_complete_context;
     esp_tls_cfg_t esp_tls_cfg;
-    esp_tls_t   *esp_tls_handle;
+    esp_tls_t *esp_tls_handle;
     TLSIO_STATE tlsio_state;
     uint16_t port;
-    char* hostname;
+    char *hostname;
     SINGLYLINKEDLIST_HANDLE pending_transmission_list;
     TLSIO_OPTIONS options;
 } TLS_IO_INSTANCE;
 
 /* Codes_SRS_TLSIO_30_005: [ The phrase "enter TLSIO_STATE_EXT_ERROR" means the adapter shall call the on_io_error function and pass the on_io_error_context that was supplied in tlsio_open_async. ]*/
-static void enter_tlsio_error_state(TLS_IO_INSTANCE* tls_io_instance)
+static void enter_tlsio_error_state(TLS_IO_INSTANCE *tls_io_instance)
 {
     if (tls_io_instance->tlsio_state != TLSIO_STATE_ERROR)
     {
@@ -78,8 +77,18 @@ static void enter_tlsio_error_state(TLS_IO_INSTANCE* tls_io_instance)
     }
 }
 
+/* Codes_SRS_TLSIO_30_005: [ When the adapter enters TLSIO_STATE_EXT_ERROR it shall call the  on_io_error function and pass the on_io_error_context that were supplied in  tlsio_open . ]*/
+static void enter_open_error_state(TLS_IO_INSTANCE *tls_io_instance)
+{
+    // save instance variables in case the framework destroys this object before we exit
+    ON_IO_OPEN_COMPLETE on_open_complete = tls_io_instance->on_open_complete;
+    void *on_open_complete_context = tls_io_instance->on_open_complete_context;
+    enter_tlsio_error_state(tls_io_instance);
+    on_open_complete(on_open_complete_context, IO_OPEN_ERROR);
+}
+
 // Return true if a message was available to remove
-static bool process_and_destroy_head_message(TLS_IO_INSTANCE* tls_io_instance, IO_SEND_RESULT send_result)
+static bool process_and_destroy_head_message(TLS_IO_INSTANCE *tls_io_instance, IO_SEND_RESULT send_result)
 {
     bool result;
     LIST_ITEM_HANDLE head_pending_io;
@@ -91,8 +100,8 @@ static bool process_and_destroy_head_message(TLS_IO_INSTANCE* tls_io_instance, I
     head_pending_io = singlylinkedlist_get_head_item(tls_io_instance->pending_transmission_list);
     if (head_pending_io != NULL)
     {
-        PENDING_TRANSMISSION* head_message = (PENDING_TRANSMISSION*)singlylinkedlist_item_get_value(head_pending_io);
-        // Must remove the item from the list before calling the callback because 
+        PENDING_TRANSMISSION *head_message = (PENDING_TRANSMISSION *)singlylinkedlist_item_get_value(head_pending_io);
+        // Must remove the item from the list before calling the callback because
         // SRS_TLSIO_30_091: [ If  tlsio_esp_tls_dowork  is able to send all the bytes in an enqueued message, it shall first dequeue the message then call the messages's  on_send_complete  along with its associated  callback_context  and  IO_SEND_OK . ]
         if (singlylinkedlist_remove(tls_io_instance->pending_transmission_list, head_pending_io) != 0)
         {
@@ -116,14 +125,15 @@ static bool process_and_destroy_head_message(TLS_IO_INSTANCE* tls_io_instance, I
     return result;
 }
 
-static void internal_close(TLS_IO_INSTANCE* tls_io_instance)
+static void internal_close(TLS_IO_INSTANCE *tls_io_instance)
 {
     /* Codes_SRS_TLSIO_30_009: [ The phrase "enter TLSIO_STATE_EXT_CLOSING" means the adapter shall iterate through any unsent messages in the queue and shall delete each message after calling its on_send_complete with the associated callback_context and IO_SEND_CANCELLED. ]*/
     /* Codes_SRS_TLSIO_30_006: [ The phrase "enter TLSIO_STATE_EXT_CLOSED" means the adapter shall forcibly close any existing connections then call the on_io_close_complete function and pass the on_io_close_complete_context that was supplied in tlsio_close_async. ]*/
     /* Codes_SRS_TLSIO_30_051: [ On success, if the underlying TLS does not support asynchronous closing, then the adapter shall enter TLSIO_STATE_EXT_CLOSED immediately after entering TLSIO_STATE_EX_CLOSING. ]*/
 
     esp_tls_conn_delete(tls_io_instance->esp_tls_handle);
-    while (process_and_destroy_head_message(tls_io_instance, IO_SEND_CANCELLED));
+    while (process_and_destroy_head_message(tls_io_instance, IO_SEND_CANCELLED))
+        ;
     // singlylinkedlist_destroy gets called in the main destroy
 
     tls_io_instance->on_bytes_received = NULL;
@@ -144,7 +154,7 @@ static void tlsio_esp_tls_destroy(CONCRETE_IO_HANDLE tls_io)
     }
     else
     {
-        TLS_IO_INSTANCE* tls_io_instance = (TLS_IO_INSTANCE*)tls_io;
+        TLS_IO_INSTANCE *tls_io_instance = (TLS_IO_INSTANCE *)tls_io;
         if (tls_io_instance->tlsio_state != TLSIO_STATE_CLOSED)
         {
             /* Codes_SRS_TLSIO_30_022: [ If the adapter is in any state other than TLSIO_STATE_EX_CLOSED when tlsio_destroy is called, the adapter shall enter TLSIO_STATE_EX_CLOSING and then enter TLSIO_STATE_EX_CLOSED before completing the destroy process. ]*/
@@ -156,7 +166,7 @@ static void tlsio_esp_tls_destroy(CONCRETE_IO_HANDLE tls_io)
         {
             free(tls_io_instance->hostname);
         }
-        
+
         tlsio_options_release_resources(&tls_io_instance->options);
 
         if (tls_io_instance->pending_transmission_list != NULL)
@@ -169,9 +179,9 @@ static void tlsio_esp_tls_destroy(CONCRETE_IO_HANDLE tls_io)
 }
 
 /* Codes_SRS_TLSIO_30_010: [ The tlsio_esp_tls_create shall allocate and initialize all necessary resources and return an instance of the tlsio_esp_tls. ]*/
-static CONCRETE_IO_HANDLE tlsio_esp_tls_create(void* io_create_parameters)
+static CONCRETE_IO_HANDLE tlsio_esp_tls_create(void *io_create_parameters)
 {
-    TLS_IO_INSTANCE* result;
+    TLS_IO_INSTANCE *result;
 
     if (io_create_parameters == NULL)
     {
@@ -182,7 +192,7 @@ static CONCRETE_IO_HANDLE tlsio_esp_tls_create(void* io_create_parameters)
     else
     {
         /* Codes_SRS_TLSIO_30_012: [ The tlsio_create shall receive the connection configuration as a TLSIO_CONFIG* in io_create_parameters. ]*/
-        TLSIO_CONFIG* tls_io_config = (TLSIO_CONFIG*)io_create_parameters;
+        TLSIO_CONFIG *tls_io_config = (TLSIO_CONFIG *)io_create_parameters;
         if (tls_io_config->hostname == NULL)
         {
             /* Codes_SRS_TLSIO_30_014: [ If the hostname member of io_create_parameters value is NULL, tlsio_create shall log an error and return NULL. ]*/
@@ -213,7 +223,7 @@ static CONCRETE_IO_HANDLE tlsio_esp_tls_create(void* io_create_parameters)
 
                 result->pending_transmission_list = NULL;
                 tlsio_options_initialize(&result->options, TLSIO_OPTION_BIT_TRUSTED_CERTS |
-                TLSIO_OPTION_BIT_x509_RSA_CERT | TLSIO_OPTION_BIT_x509_ECC_CERT);
+                                                               TLSIO_OPTION_BIT_x509_RSA_CERT | TLSIO_OPTION_BIT_x509_ECC_CERT);
                 result->esp_tls_handle = calloc(1, sizeof(esp_tls_t));
                 if (result->esp_tls_handle == NULL)
                 {
@@ -251,11 +261,10 @@ static CONCRETE_IO_HANDLE tlsio_esp_tls_create(void* io_create_parameters)
     return (CONCRETE_IO_HANDLE)result;
 }
 
-
 static int tlsio_esp_tls_open_async(CONCRETE_IO_HANDLE tls_io,
-    ON_IO_OPEN_COMPLETE on_io_open_complete, void* on_io_open_complete_context,
-    ON_BYTES_RECEIVED on_bytes_received, void* on_bytes_received_context,
-    ON_IO_ERROR on_io_error, void* on_io_error_context)
+                                    ON_IO_OPEN_COMPLETE on_io_open_complete, void *on_io_open_complete_context,
+                                    ON_BYTES_RECEIVED on_bytes_received, void *on_bytes_received_context,
+                                    ON_IO_ERROR on_io_error, void *on_io_error_context)
 {
 
     int result;
@@ -291,7 +300,7 @@ static int tlsio_esp_tls_open_async(CONCRETE_IO_HANDLE tls_io,
                 }
                 else
                 {
-                    TLS_IO_INSTANCE* tls_io_instance = (TLS_IO_INSTANCE*)tls_io;
+                    TLS_IO_INSTANCE *tls_io_instance = (TLS_IO_INSTANCE *)tls_io;
 
                     if (tls_io_instance->tlsio_state != TLSIO_STATE_CLOSED)
                     {
@@ -313,13 +322,15 @@ static int tlsio_esp_tls_open_async(CONCRETE_IO_HANDLE tls_io,
                         tls_io_instance->on_open_complete_context = on_io_open_complete_context;
 
                         tls_io_instance->esp_tls_cfg.non_block = true;
-                        if (tls_io_instance->options.x509_key != NULL && tls_io_instance->options.x509_cert != NULL) {
+                        if (tls_io_instance->options.x509_key != NULL && tls_io_instance->options.x509_cert != NULL)
+                        {
                             tls_io_instance->esp_tls_cfg.clientcert_pem_buf = (unsigned char *)tls_io_instance->options.x509_cert;
                             tls_io_instance->esp_tls_cfg.clientcert_pem_bytes = strlen(tls_io_instance->options.x509_cert) + 1;
                             tls_io_instance->esp_tls_cfg.clientkey_pem_buf = (unsigned char *)tls_io_instance->options.x509_key;
                             tls_io_instance->esp_tls_cfg.clientkey_pem_bytes = strlen(tls_io_instance->options.x509_key) + 1;
                         }
-                        if (tls_io_instance->options.trusted_certs != NULL) {
+                        if (tls_io_instance->options.trusted_certs != NULL)
+                        {
                             tls_io_instance->esp_tls_cfg.cacert_pem_buf = (unsigned char *)tls_io_instance->options.trusted_certs;
                             tls_io_instance->esp_tls_cfg.cacert_pem_bytes = strlen(tls_io_instance->options.trusted_certs) + 1;
                         }
@@ -337,7 +348,7 @@ static int tlsio_esp_tls_open_async(CONCRETE_IO_HANDLE tls_io,
 }
 
 // This implementation does not have asynchronous close, but uses the _async name for consistency with the spec
-static int tlsio_esp_tls_close_async(CONCRETE_IO_HANDLE tls_io, ON_IO_CLOSE_COMPLETE on_io_close_complete, void* callback_context)
+static int tlsio_esp_tls_close_async(CONCRETE_IO_HANDLE tls_io, ON_IO_CLOSE_COMPLETE on_io_close_complete, void *callback_context)
 {
     int result;
 
@@ -357,7 +368,7 @@ static int tlsio_esp_tls_close_async(CONCRETE_IO_HANDLE tls_io, ON_IO_CLOSE_COMP
         }
         else
         {
-            TLS_IO_INSTANCE* tls_io_instance = (TLS_IO_INSTANCE*)tls_io;
+            TLS_IO_INSTANCE *tls_io_instance = (TLS_IO_INSTANCE *)tls_io;
 
             if (tls_io_instance->tlsio_state != TLSIO_STATE_OPEN &&
                 tls_io_instance->tlsio_state != TLSIO_STATE_ERROR)
@@ -385,7 +396,7 @@ static int tlsio_esp_tls_close_async(CONCRETE_IO_HANDLE tls_io, ON_IO_CLOSE_COMP
     return result;
 }
 
-static void dowork_read(TLS_IO_INSTANCE* tls_io_instance)
+static void dowork_read(TLS_IO_INSTANCE *tls_io_instance)
 {
     // TRANSFER_BUFFER_SIZE is not very important because if the message is bigger
     // then the framework just calls dowork repeatedly until it gets everything. So
@@ -397,28 +408,55 @@ static void dowork_read(TLS_IO_INSTANCE* tls_io_instance)
 
     if (tls_io_instance->tlsio_state == TLSIO_STATE_OPEN)
     {
-        rcv_bytes = esp_tls_conn_read(tls_io_instance->esp_tls_handle, buffer, sizeof(buffer));
-        while (rcv_bytes > 0)
+        // rcv_bytes = esp_tls_conn_read(tls_io_instance->esp_tls_handle, buffer, sizeof(buffer));
+        // if (rcv_bytes <= 0)
+        // {
+        //     LogError("1 Communications error while reading: %d", rcv_bytes);
+        //     enter_tlsio_error_state(tls_io_instance);
+        // }
+        // else
+        // {
+        while (tls_io_instance->tlsio_state == TLSIO_STATE_OPEN)
         {
             // tls_io_instance->on_bytes_received was already checked for NULL
             // in the call to tlsio_esp_tls_open_async
             /* Codes_SRS_TLSIO_30_100: [ As long as the TLS connection is able to provide received data, tlsio_dowork shall repeatedly read this data and call on_bytes_received with the pointer to the buffer containing the data, the number of bytes received, and the on_bytes_received_context. ]*/
-            tls_io_instance->on_bytes_received(tls_io_instance->on_bytes_received_context, buffer, rcv_bytes);
             rcv_bytes = esp_tls_conn_read(tls_io_instance->esp_tls_handle, buffer, sizeof(buffer));
+
+            if (rcv_bytes == MBEDTLS_ERR_SSL_WANT_READ || rcv_bytes == MBEDTLS_ERR_SSL_WANT_WRITE)
+            {
+                break;
+            }
+            else if (rcv_bytes > 0)
+            {
+                tls_io_instance->on_bytes_received(tls_io_instance->on_bytes_received_context, buffer, rcv_bytes);
+            }
+            else
+            {
+                LogError("Communications error while reading: %d", rcv_bytes);
+                enter_tlsio_error_state(tls_io_instance);
+            }
         }
         /* Codes_SRS_TLSIO_30_102: [ If the TLS connection receives no data then tlsio_dowork shall not call the on_bytes_received callback. ]*/
     }
+    // }
 }
 
-static void dowork_send(TLS_IO_INSTANCE* tls_io_instance)
+static void dowork_send(TLS_IO_INSTANCE *tls_io_instance)
 {
     LIST_ITEM_HANDLE first_pending_io = singlylinkedlist_get_head_item(tls_io_instance->pending_transmission_list);
     if (first_pending_io != NULL)
     {
-        PENDING_TRANSMISSION* pending_message = (PENDING_TRANSMISSION*)singlylinkedlist_item_get_value(first_pending_io);
-        uint8_t* buffer = ((uint8_t*)pending_message->bytes) +
-            pending_message->size - pending_message->unsent_size;
-        int write_result = esp_tls_conn_write(tls_io_instance->esp_tls_handle, buffer, pending_message->unsent_size);
+        PENDING_TRANSMISSION *pending_message = (PENDING_TRANSMISSION *)singlylinkedlist_item_get_value(first_pending_io);
+        uint8_t *buffer = ((uint8_t *)pending_message->bytes) + pending_message->size - pending_message->unsent_size;
+        int write_result = -1;
+
+        do
+        {
+            write_result = esp_tls_conn_write(tls_io_instance->esp_tls_handle, buffer, pending_message->unsent_size);
+            LogInfo("esp_tls_conn_write: %d", write_result);
+        } while (write_result == MBEDTLS_ERR_SSL_WANT_WRITE);
+
         if (write_result > 0)
         {
             pending_message->unsent_size -= write_result;
@@ -438,6 +476,7 @@ static void dowork_send(TLS_IO_INSTANCE* tls_io_instance)
         else
         {
             LogInfo("Error from SSL_write: %d", write_result);
+            process_and_destroy_head_message(tls_io_instance, IO_SEND_ERROR);
         }
     }
     else
@@ -455,7 +494,7 @@ static void tlsio_esp_tls_dowork(CONCRETE_IO_HANDLE tls_io)
     }
     else
     {
-        TLS_IO_INSTANCE* tls_io_instance = (TLS_IO_INSTANCE*)tls_io;
+        TLS_IO_INSTANCE *tls_io_instance = (TLS_IO_INSTANCE *)tls_io;
 
         // This switch statement handles all of the state transitions during the opening process
         switch (tls_io_instance->tlsio_state)
@@ -465,16 +504,19 @@ static void tlsio_esp_tls_dowork(CONCRETE_IO_HANDLE tls_io)
             // Waiting to be opened, nothing to do
             break;
         case TLSIO_STATE_INIT:
-            {
+        {
             int result = esp_tls_conn_new_async(tls_io_instance->hostname, strlen(tls_io_instance->hostname), tls_io_instance->port, &tls_io_instance->esp_tls_cfg, tls_io_instance->esp_tls_handle);
-            if (result == 1) {
+            if (result == 1)
+            {
                 tls_io_instance->tlsio_state = TLSIO_STATE_OPEN;
                 tls_io_instance->on_open_complete(tls_io_instance->on_open_complete_context, IO_OPEN_OK);
-            } else if (result == -1) {
-                tls_io_instance->tlsio_state = TLSIO_STATE_ERROR;
             }
+            else if (result == -1)
+            {
+                enter_open_error_state(tls_io_instance);
             }
-            break;
+        }
+        break;
         case TLSIO_STATE_OPEN:
             dowork_read(tls_io_instance);
             dowork_send(tls_io_instance);
@@ -490,7 +532,7 @@ static void tlsio_esp_tls_dowork(CONCRETE_IO_HANDLE tls_io)
     }
 }
 
-static int tlsio_esp_tls_send_async(CONCRETE_IO_HANDLE tls_io, const void* buffer, size_t size, ON_SEND_COMPLETE on_send_complete, void* callback_context)
+static int tlsio_esp_tls_send_async(CONCRETE_IO_HANDLE tls_io, const void *buffer, size_t size, ON_SEND_COMPLETE on_send_complete, void *callback_context)
 {
     int result;
     if (on_send_complete == NULL)
@@ -525,7 +567,7 @@ static int tlsio_esp_tls_send_async(CONCRETE_IO_HANDLE tls_io, const void* buffe
                 }
                 else
                 {
-                    TLS_IO_INSTANCE* tls_io_instance = (TLS_IO_INSTANCE*)tls_io;
+                    TLS_IO_INSTANCE *tls_io_instance = (TLS_IO_INSTANCE *)tls_io;
                     if (tls_io_instance->tlsio_state != TLSIO_STATE_OPEN)
                     {
                         result = __FAILURE__;
@@ -533,7 +575,7 @@ static int tlsio_esp_tls_send_async(CONCRETE_IO_HANDLE tls_io, const void* buffe
                     }
                     else
                     {
-                        PENDING_TRANSMISSION* pending_transmission = (PENDING_TRANSMISSION*)malloc(sizeof(PENDING_TRANSMISSION));
+                        PENDING_TRANSMISSION *pending_transmission = (PENDING_TRANSMISSION *)malloc(sizeof(PENDING_TRANSMISSION));
                         if (pending_transmission == NULL)
                         {
                             /* Codes_SRS_TLSIO_30_064: [ If the supplied message cannot be enqueued for transmission, tlsio_esp_tls_send shall log an error and return FAILURE. ]*/
@@ -543,7 +585,7 @@ static int tlsio_esp_tls_send_async(CONCRETE_IO_HANDLE tls_io, const void* buffe
                         else
                         {
                             /* Codes_SRS_TLSIO_30_063: [ The tlsio_esp_tls_send_async shall enqueue for transmission the on_send_complete, the callback_context, the size, and the contents of buffer. ]*/
-                            pending_transmission->bytes = (unsigned char*)malloc(size);
+                            pending_transmission->bytes = (unsigned char *)malloc(size);
 
                             if (pending_transmission->bytes == NULL)
                             {
@@ -585,9 +627,9 @@ static int tlsio_esp_tls_send_async(CONCRETE_IO_HANDLE tls_io, const void* buffe
     return result;
 }
 
-static int tlsio_esp_tls_setoption(CONCRETE_IO_HANDLE tls_io, const char* optionName, const void* value)
+static int tlsio_esp_tls_setoption(CONCRETE_IO_HANDLE tls_io, const char *optionName, const void *value)
 {
-    TLS_IO_INSTANCE* tls_io_instance = (TLS_IO_INSTANCE*)tls_io;
+    TLS_IO_INSTANCE *tls_io_instance = (TLS_IO_INSTANCE *)tls_io;
     /* Codes_SRS_TLSIO_30_120: [ If the tlsio_handle parameter is NULL, tlsio_esp_tls_setoption shall do nothing except log an error and return FAILURE. ]*/
     int result;
     if (tls_io_instance == NULL)
@@ -617,7 +659,7 @@ static int tlsio_esp_tls_setoption(CONCRETE_IO_HANDLE tls_io, const char* option
 /* Codes_SRS_TLSIO_ESP_TLS_COMPACT_30_560: [ The  tlsio_esp_tls_retrieveoptions  shall do nothing and return an empty options handler. ]*/
 static OPTIONHANDLER_HANDLE tlsio_esp_tls_retrieveoptions(CONCRETE_IO_HANDLE tls_io)
 {
-    TLS_IO_INSTANCE* tls_io_instance = (TLS_IO_INSTANCE*)tls_io;
+    TLS_IO_INSTANCE *tls_io_instance = (TLS_IO_INSTANCE *)tls_io;
     /* Codes_SRS_TLSIO_30_160: [ If the tlsio_handle parameter is NULL, tlsio_esp_tls_retrieveoptions shall do nothing except log an error and return FAILURE. ]*/
     OPTIONHANDLER_HANDLE result;
     if (tls_io_instance == NULL)
@@ -634,19 +676,18 @@ static OPTIONHANDLER_HANDLE tlsio_esp_tls_retrieveoptions(CONCRETE_IO_HANDLE tls
 
 /* Codes_SRS_TLSIO_30_008: [ The tlsio_get_interface_description shall return the VTable IO_INTERFACE_DESCRIPTION. ]*/
 static const IO_INTERFACE_DESCRIPTION tlsio_esp_tls_interface_description =
-{
-    tlsio_esp_tls_retrieveoptions,
-    tlsio_esp_tls_create,
-    tlsio_esp_tls_destroy,
-    tlsio_esp_tls_open_async,
-    tlsio_esp_tls_close_async,
-    tlsio_esp_tls_send_async,
-    tlsio_esp_tls_dowork,
-    tlsio_esp_tls_setoption
-};
+    {
+        tlsio_esp_tls_retrieveoptions,
+        tlsio_esp_tls_create,
+        tlsio_esp_tls_destroy,
+        tlsio_esp_tls_open_async,
+        tlsio_esp_tls_close_async,
+        tlsio_esp_tls_send_async,
+        tlsio_esp_tls_dowork,
+        tlsio_esp_tls_setoption};
 
 /* Codes_SRS_TLSIO_30_001: [ The tlsio_esp_tls shall implement and export all the Concrete functions in the VTable IO_INTERFACE_DESCRIPTION defined in the xio.h. ]*/
-const IO_INTERFACE_DESCRIPTION* tlsio_pal_get_interface_description(void)
+const IO_INTERFACE_DESCRIPTION *tlsio_pal_get_interface_description(void)
 {
     return &tlsio_esp_tls_interface_description;
 }
