@@ -415,6 +415,7 @@ static void dowork_read(TLS_IO_INSTANCE *tls_io_instance)
 
         if (rcv_bytes > 0)
         {
+            LogInfo("esp_tls_conn_read: %d", rcv_bytes);
             tls_io_instance->on_bytes_received(tls_io_instance->on_bytes_received_context, buffer, rcv_bytes);
         }
         else if (rcv_bytes == MBEDTLS_ERR_SSL_WANT_READ || rcv_bytes == MBEDTLS_ERR_SSL_WANT_WRITE)
@@ -423,7 +424,7 @@ static void dowork_read(TLS_IO_INSTANCE *tls_io_instance)
         }
         else
         {
-            LogError("Communications error while reading: %d", rcv_bytes);
+            LogInfo("Error from esp_tls_conn_read: %d", rcv_bytes);
             enter_tlsio_error_state(tls_io_instance);
         }
     }
@@ -465,7 +466,7 @@ static void dowork_send(TLS_IO_INSTANCE *tls_io_instance)
                 /* Codes_SRS_TLSIO_30_005: [ When the adapter enters TLSIO_STATE_EXT_ERROR it shall call the  on_io_error function and pass the on_io_error_context that were supplied in  tlsio_open . ]*/
                 /* Codes_SRS_TLSIO_30_095: [ If the send process fails before sending all of the bytes in an enqueued message, tlsio_dowork shall destroy the failed message and enter TLSIO_STATE_EX_ERROR. ]*/
                 // This is an unexpected error, and we need to bail out. Probably lost internet connection.
-                LogInfo("Error from SSL_write: %d", write_result);
+                LogInfo("Error from esp_tls_conn_write: %d", write_result);
                 process_and_destroy_head_message(tls_io_instance, IO_SEND_ERROR);
             }
         }
