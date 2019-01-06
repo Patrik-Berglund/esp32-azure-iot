@@ -406,40 +406,28 @@ static void dowork_read(TLS_IO_INSTANCE *tls_io_instance)
     unsigned char buffer[TLSIO_RECEIVE_BUFFER_SIZE];
     int rcv_bytes;
 
-    if (tls_io_instance->tlsio_state == TLSIO_STATE_OPEN)
+    while (tls_io_instance->tlsio_state == TLSIO_STATE_OPEN)
     {
-        // rcv_bytes = esp_tls_conn_read(tls_io_instance->esp_tls_handle, buffer, sizeof(buffer));
-        // if (rcv_bytes <= 0)
-        // {
-        //     LogError("1 Communications error while reading: %d", rcv_bytes);
-        //     enter_tlsio_error_state(tls_io_instance);
-        // }
-        // else
-        // {
-        while (tls_io_instance->tlsio_state == TLSIO_STATE_OPEN)
-        {
-            // tls_io_instance->on_bytes_received was already checked for NULL
-            // in the call to tlsio_esp_tls_open_async
-            /* Codes_SRS_TLSIO_30_100: [ As long as the TLS connection is able to provide received data, tlsio_dowork shall repeatedly read this data and call on_bytes_received with the pointer to the buffer containing the data, the number of bytes received, and the on_bytes_received_context. ]*/
-            rcv_bytes = esp_tls_conn_read(tls_io_instance->esp_tls_handle, buffer, sizeof(buffer));
+        // tls_io_instance->on_bytes_received was already checked for NULL
+        // in the call to tlsio_esp_tls_open_async
+        /* Codes_SRS_TLSIO_30_100: [ As long as the TLS connection is able to provide received data, tlsio_dowork shall repeatedly read this data and call on_bytes_received with the pointer to the buffer containing the data, the number of bytes received, and the on_bytes_received_context. ]*/
+        rcv_bytes = esp_tls_conn_read(tls_io_instance->esp_tls_handle, buffer, sizeof(buffer));
 
-            if (rcv_bytes == MBEDTLS_ERR_SSL_WANT_READ || rcv_bytes == MBEDTLS_ERR_SSL_WANT_WRITE)
-            {
-                break;
-            }
-            else if (rcv_bytes > 0)
-            {
-                tls_io_instance->on_bytes_received(tls_io_instance->on_bytes_received_context, buffer, rcv_bytes);
-            }
-            else
-            {
-                LogError("Communications error while reading: %d", rcv_bytes);
-                enter_tlsio_error_state(tls_io_instance);
-            }
+        if (rcv_bytes > 0)
+        {
+            tls_io_instance->on_bytes_received(tls_io_instance->on_bytes_received_context, buffer, rcv_bytes);
         }
-        /* Codes_SRS_TLSIO_30_102: [ If the TLS connection receives no data then tlsio_dowork shall not call the on_bytes_received callback. ]*/
+        else if (rcv_bytes == MBEDTLS_ERR_SSL_WANT_READ || rcv_bytes == MBEDTLS_ERR_SSL_WANT_WRITE)
+        {
+            break;
+        }
+        else
+        {
+            LogError("Communications error while reading: %d", rcv_bytes);
+            enter_tlsio_error_state(tls_io_instance);
+        }
     }
-    // }
+    /* Codes_SRS_TLSIO_30_102: [ If the TLS connection receives no data then tlsio_dowork shall not call the on_bytes_received callback. ]*/
 }
 
 static void dowork_send(TLS_IO_INSTANCE *tls_io_instance)
@@ -449,13 +437,8 @@ static void dowork_send(TLS_IO_INSTANCE *tls_io_instance)
     {
         PENDING_TRANSMISSION *pending_message = (PENDING_TRANSMISSION *)singlylinkedlist_item_get_value(first_pending_io);
         uint8_t *buffer = ((uint8_t *)pending_message->bytes) + pending_message->size - pending_message->unsent_size;
-        int write_result = -1;
-
-        do
-        {
-            write_result = esp_tls_conn_write(tls_io_instance->esp_tls_handle, buffer, pending_message->unsent_size);
-            LogInfo("esp_tls_conn_write: %d", write_result);
-        } while (write_result == MBEDTLS_ERR_SSL_WANT_WRITE);
+        int write_result = esp_tls_conn_write(tls_io_instance->esp_tls_handle, buffer, pending_message->unsent_size);
+        LogInfo("esp_tls_conn_write: %d", write_result);
 
         if (write_result > 0)
         {
@@ -475,8 +458,16 @@ static void dowork_send(TLS_IO_INSTANCE *tls_io_instance)
         }
         else
         {
-            LogInfo("Error from SSL_write: %d", write_result);
-            process_and_destroy_head_message(tls_io_instance, IO_SEND_ERROR);
+            // SSL_write returned non-success. It may just be busy, or it may be broken.
+            if (write_result != MBEDTLS_ERR_SSL_WANT_READ && write_result != MBEDTLS_ERR_SSL_WANT_WRITE)
+            {
+                /* Codes_SRS_TLSIO_30_002: [ The phrase "destroy the failed message" means that the adapter shall remove the message from the queue and destroy it after calling the message's on_send_complete along with its associated callback_context and IO_SEND_ERROR. ]*/
+                /* Codes_SRS_TLSIO_30_005: [ When the adapter enters TLSIO_STATE_EXT_ERROR it shall call the  on_io_error function and pass the on_io_error_context that were supplied in  tlsio_open . ]*/
+                /* Codes_SRS_TLSIO_30_095: [ If the send process fails before sending all of the bytes in an enqueued message, tlsio_dowork shall destroy the failed message and enter TLSIO_STATE_EX_ERROR. ]*/
+                // This is an unexpected error, and we need to bail out. Probably lost internet connection.
+                LogInfo("Error from SSL_write: %d", write_result);
+                process_and_destroy_head_message(tls_io_instance, IO_SEND_ERROR);
+            }
         }
     }
     else
