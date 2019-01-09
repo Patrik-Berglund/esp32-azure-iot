@@ -3,7 +3,7 @@
 #
  
 # Component configuration in preprocessor defines
-CFLAGS += -DUSE_LWIP_SOCKET_FOR_AZURE_IOT -Duse_amqp=OFF -Duse_http=OFF 
+CFLAGS += -DUSE_LWIP_SOCKET_FOR_AZURE_IOT -Duse_amqp=OFF -Duse_http=OFF
 CFLAGS += -Wno-unused-function -Wno-missing-braces -Wno-missing-field-initializers
 
 COMPONENT_ADD_INCLUDEDIRS := \
@@ -84,6 +84,7 @@ azure-iot-sdk-c/iothub_client/src/iothub_message.o \
 azure-iot-sdk-c/iothub_client/src/iothubtransport.o \
 azure-iot-sdk-c/iothub_client/src/iothubtransportmqtt.o \
 azure-iot-sdk-c/iothub_client/src/iothubtransport_mqtt_common.o \
+azure-iot-sdk-c/iothub_client/src/iothub_transport_ll_private.o \
 azure-iot-sdk-c/iothub_client/src/version.o \
 \
 \

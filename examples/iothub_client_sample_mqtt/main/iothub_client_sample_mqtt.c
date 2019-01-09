@@ -80,6 +80,10 @@ void iothub_client_sample_mqtt_run(void)
             bool traceOn = true;
             IoTHubClient_LL_SetOption(iotHubClientHandle, OPTION_LOG_TRACE, &traceOn);
             IoTHubClient_LL_SetOption(iotHubClientHandle, OPTION_TRUSTED_CERT, certificates);
+            // int mqttPingFreqInSecs = 15;
+            // IoTHubClient_LL_SetOption(iotHubClientHandle, OPTION_KEEP_ALIVE, &mqttPingFreqInSecs);
+            // int sasTokenLifetime = 60;
+            // IoTHubClient_LL_SetOption(iotHubClientHandle, OPTION_SAS_TOKEN_LIFETIME, &sasTokenLifetime);
 
             do
             {

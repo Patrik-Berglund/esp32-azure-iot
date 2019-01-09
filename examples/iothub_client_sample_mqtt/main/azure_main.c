@@ -33,6 +33,7 @@ static esp_err_t event_handler(void *ctx, system_event_t *event)
         esp_wifi_connect();
         break;
     case SYSTEM_EVENT_STA_GOT_IP:
+    case SYSTEM_EVENT_AP_STA_GOT_IP6:
         xEventGroupSetBits(wifi_event_group, CONNECTED_BIT);
         ESP_LOGI(TAG, "SYSTEM_EVENT_STA_GOT_IP.");
         break;
@@ -71,6 +72,7 @@ static void initialise_wifi(void)
     ESP_LOGI(TAG, "Setting WiFi configuration SSID %s...", wifi_config.sta.ssid);
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config));
+    ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
     ESP_ERROR_CHECK(esp_wifi_start());
 }
 
@@ -130,8 +132,6 @@ void app_main()
 
     initialise_wifi();
 
-    // xTaskCreate(&azure_task, "azure_task", 1024 * 5, NULL, 5, NULL);
-    // xTaskCreate(&heapPoll, "heapPoll", 4096, NULL, 0, NULL);
     xTaskCreatePinnedToCore(&azure_task, "azure_task", 1024 * 16, NULL, 5, NULL, 1);
     xTaskCreatePinnedToCore(&heapPoll, "heapPoll", 1024 * 5, NULL, 0, NULL, 1);
 }
