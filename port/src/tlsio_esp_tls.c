@@ -39,14 +39,14 @@ typedef struct
 typedef enum TLSIO_STATE_TAG
 {
     TLSIO_STATE_CLOSED,
-    TLSIO_STATE_INIT,
+    TLSIO_STATE_OPENING,
     TLSIO_STATE_OPEN,
     TLSIO_STATE_ERROR,
 } TLSIO_STATE;
 
 bool is_an_opening_state(TLSIO_STATE state)
 {
-    return state == TLSIO_STATE_INIT;
+    return state == TLSIO_STATE_OPENING;
 }
 
 // This structure definition is mirrored in the unit tests, so if you change
@@ -82,11 +82,20 @@ static void enter_tlsio_error_state(TLS_IO_INSTANCE *tls_io_instance)
 static void enter_open_error_state(TLS_IO_INSTANCE *tls_io_instance)
 {
     LogInfo("enter_open_error_state");
-    // save instance variables in case the framework destroys this object before we exit
     ON_IO_OPEN_COMPLETE on_open_complete = tls_io_instance->on_open_complete;
     void *on_open_complete_context = tls_io_instance->on_open_complete_context;
-    enter_tlsio_error_state(tls_io_instance);
     on_open_complete(on_open_complete_context, IO_OPEN_ERROR);
+
+    esp_tls_conn_delete(tls_io_instance->esp_tls_handle);
+    tls_io_instance->esp_tls_handle = NULL;
+
+    tls_io_instance->on_bytes_received = NULL;
+    tls_io_instance->on_io_error = NULL;
+    tls_io_instance->on_bytes_received_context = NULL;
+    tls_io_instance->on_io_error_context = NULL;
+    tls_io_instance->tlsio_state = TLSIO_STATE_CLOSED;
+    tls_io_instance->on_open_complete = NULL;
+    tls_io_instance->on_open_complete_context = NULL;
 }
 
 // Return true if a message was available to remove
@@ -136,6 +145,7 @@ static void internal_close(TLS_IO_INSTANCE *tls_io_instance)
     /* Codes_SRS_TLSIO_30_051: [ On success, if the underlying TLS does not support asynchronous closing, then the adapter shall enter TLSIO_STATE_EXT_CLOSED immediately after entering TLSIO_STATE_EX_CLOSING. ]*/
 
     esp_tls_conn_delete(tls_io_instance->esp_tls_handle);
+    tls_io_instance->esp_tls_handle = NULL;
     while (process_and_destroy_head_message(tls_io_instance, IO_SEND_CANCELLED))
         ;
     // singlylinkedlist_destroy gets called in the main destroy
@@ -341,7 +351,19 @@ static int tlsio_esp_tls_open_async(CONCRETE_IO_HANDLE tls_io,
                             tls_io_instance->esp_tls_cfg.cacert_pem_bytes = strlen(tls_io_instance->options.trusted_certs) + 1;
                         }
 
-                        tls_io_instance->tlsio_state = TLSIO_STATE_INIT;
+                        if (tls_io_instance->esp_tls_handle == NULL)
+                        {
+                            tls_io_instance->esp_tls_handle = calloc(1, sizeof(esp_tls_t));
+                            if (tls_io_instance->esp_tls_handle == NULL)
+                            {
+                                /* Codes_SRS_TLSIO_30_011: [ If any resource allocation fails, tlsio_create shall return NULL. ]*/
+                                LogError("malloc failed");
+                                tlsio_esp_tls_destroy(tls_io_instance);
+                                result = __FAILURE__;
+                            }
+                        }
+
+                        tls_io_instance->tlsio_state = TLSIO_STATE_OPENING;
                         result = 0;
                     }
                 }
@@ -440,7 +462,7 @@ static void dowork_read(TLS_IO_INSTANCE *tls_io_instance)
 
 static void dowork_send(TLS_IO_INSTANCE *tls_io_instance)
 {
-    while (tls_io_instance->tlsio_state == TLSIO_STATE_OPEN)
+    if (tls_io_instance->tlsio_state == TLSIO_STATE_OPEN)
     {
         LIST_ITEM_HANDLE first_pending_io = singlylinkedlist_get_head_item(tls_io_instance->pending_transmission_list);
         if (first_pending_io != NULL)
@@ -483,7 +505,6 @@ static void dowork_send(TLS_IO_INSTANCE *tls_io_instance)
         else
         {
             /* Codes_SRS_TLSIO_30_096: [ If there are no enqueued messages available, tlsio_esp_tls_dowork shall do nothing. ]*/
-            break;
         }
     }
 }
@@ -506,17 +527,19 @@ static void tlsio_esp_tls_dowork(CONCRETE_IO_HANDLE tls_io)
             /* Codes_SRS_TLSIO_30_075: [ If the adapter is in TLSIO_STATE_EXT_CLOSED then  tlsio_dowork  shall do nothing. ]*/
             // Waiting to be opened, nothing to do
             break;
-        case TLSIO_STATE_INIT:
+        case TLSIO_STATE_OPENING:
         {
             int result = esp_tls_conn_new_async(tls_io_instance->hostname, strlen(tls_io_instance->hostname), tls_io_instance->port, &tls_io_instance->esp_tls_cfg, tls_io_instance->esp_tls_handle);
+            LogInfo("esp_tls_conn_new_async :%d", result);
             if (result == 1)
             {
-                LogInfo("esp_tls_conn_new_async");
+                LogInfo("esp_tls_conn_new_async TLSIO_STATE_OPEN");
                 tls_io_instance->tlsio_state = TLSIO_STATE_OPEN;
                 tls_io_instance->on_open_complete(tls_io_instance->on_open_complete_context, IO_OPEN_OK);
             }
             else if (result == -1)
             {
+                LogError("esp_tls_conn_new_async FAIL");
                 enter_open_error_state(tls_io_instance);
             }
         }
