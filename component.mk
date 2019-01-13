@@ -30,7 +30,6 @@ azure-iot-sdk-c/c-utility/pal/dns_async.o \
 azure-iot-sdk-c/c-utility/pal/socket_async.o \
 azure-iot-sdk-c/c-utility/pal/freertos/threadapi.o \
 azure-iot-sdk-c/c-utility/pal/freertos/tickcounter.o \
-azure-iot-sdk-c/c-utility/pal/tlsio_options.o \
 azure-iot-sdk-c/c-utility/pal/lwip/sntp_lwip.o	\
 \
 \
@@ -40,7 +39,9 @@ azure-iot-sdk-c/c-utility/adapters/agenttime.o	\
 \
 \
 port/src/platform_openssl_compact.o \
-port/src/tlsio_esp_tls.o \
+port/src/mbed_wait_api.o \
+azure-iot-sdk-c/c-utility/adapters/tlsio_mbedtls.o	\
+port/src/socketio_berkeley.o	\
 \
 \
 azure-iot-sdk-c/c-utility/src/xlogging.o \
