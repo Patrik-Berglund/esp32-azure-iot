@@ -3,7 +3,7 @@
 #
  
 # Component configuration in preprocessor defines
-CFLAGS += -DUSE_LWIP_SOCKET_FOR_AZURE_IOT -Duse_amqp=OFF -Duse_http=OFF
+CFLAGS += -DUSE_LWIP_SOCKET_FOR_AZURE_IOT -Duse_amqp=OFF -Duse_http=OFF -DHSM_TYPE_SYMM_KEY
 CFLAGS += -Wno-unused-function -Wno-missing-braces -Wno-missing-field-initializers
 
 COMPONENT_ADD_INCLUDEDIRS := \
@@ -19,7 +19,9 @@ azure-iot-sdk-c/iothub_client/inc \
 azure-iot-sdk-c/umqtt/inc \
 azure-iot-sdk-c/umqtt/inc/azure_umqtt_c \
 azure-iot-sdk-c/deps/parson \
- 
+azure-iot-sdk-c/provisioning_client/inc \
+azure-iot-sdk-c/provisioning_client/azure_prov_client \
+azure-iot-sdk-c/provisioning_client/adapters \
  
 COMPONENT_OBJS = \
 azure-iot-sdk-c/certs/certs.o \
@@ -75,6 +77,7 @@ azure-iot-sdk-c/c-utility/src/xio.o \
 azure-iot-sdk-c/c-utility/src/azure_base64.o \
 \
 \
+azure-iot-sdk-c/iothub_client/src/iothub_device_client_ll.o \
 azure-iot-sdk-c/iothub_client/src/iothub_client_ll.o \
 azure-iot-sdk-c/iothub_client/src/iothub_client_core_ll.o \
 azure-iot-sdk-c/iothub_client/src/iothub_client_ll_uploadtoblob.o \
@@ -95,6 +98,16 @@ azure-iot-sdk-c/umqtt/src/mqtt_message.o \
 \
 \
 azure-iot-sdk-c/deps/parson/parson.o \
+\
+\
+azure-iot-sdk-c/provisioning_client/src/prov_auth_client.o \
+azure-iot-sdk-c/provisioning_client/src/prov_device_ll_client.o \
+azure-iot-sdk-c/provisioning_client/src/prov_security_factory.o \
+azure-iot-sdk-c/provisioning_client/src/iothub_security_factory.o \
+azure-iot-sdk-c/provisioning_client/src/prov_transport_mqtt_client.o \
+azure-iot-sdk-c/provisioning_client/src/prov_transport_mqtt_common.o \
+azure-iot-sdk-c/provisioning_client/adapters/hsm_client_data.o \
+azure-iot-sdk-c/provisioning_client/adapters/hsm_client_key.o \
 
 COMPONENT_SRCDIRS := \
 port/src \
@@ -107,4 +120,6 @@ azure-iot-sdk-c/c-utility/adapters \
 azure-iot-sdk-c/umqtt/src \
 azure-iot-sdk-c/iothub_client/src \
 azure-iot-sdk-c/deps/parson \
+azure-iot-sdk-c/provisioning_client/src \
+azure-iot-sdk-c/provisioning_client/adapters \
 

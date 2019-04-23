@@ -40,16 +40,16 @@
 #include <sys/un.h>
 
 #define __APPLE__
-#define SOCKET_SUCCESS                 0
-#define INVALID_SOCKET                 -1
-#define MAC_ADDRESS_STRING_LENGTH      18
+#define SOCKET_SUCCESS 0
+#define INVALID_SOCKET -1
+#define MAC_ADDRESS_STRING_LENGTH 18
 
 #ifndef IFREQ_BUFFER_SIZE
-#define IFREQ_BUFFER_SIZE              1024
+#define IFREQ_BUFFER_SIZE 1024
 #endif
 
 // connect timeout in seconds
-#define CONNECT_TIMEOUT         10
+#define CONNECT_TIMEOUT 10
 
 typedef enum IO_STATE_TAG
 {
@@ -62,10 +62,10 @@ typedef enum IO_STATE_TAG
 
 typedef struct PENDING_SOCKET_IO_TAG
 {
-    unsigned char* bytes;
+    unsigned char *bytes;
     size_t size;
     ON_SEND_COMPLETE on_send_complete;
-    void* callback_context;
+    void *callback_context;
     SINGLYLINKEDLIST_HANDLE pending_io_list;
 } PENDING_SOCKET_IO;
 
@@ -75,11 +75,11 @@ typedef struct SOCKET_IO_INSTANCE_TAG
     SOCKETIO_ADDRESS_TYPE address_type;
     ON_BYTES_RECEIVED on_bytes_received;
     ON_IO_ERROR on_io_error;
-    void* on_bytes_received_context;
-    void* on_io_error_context;
-    char* hostname;
+    void *on_bytes_received_context;
+    void *on_io_error_context;
+    char *hostname;
     int port;
-    char* target_mac_address;
+    char *target_mac_address;
     IO_STATE io_state;
     SINGLYLINKEDLIST_HANDLE pending_io_list;
     unsigned char recv_bytes[RECEIVE_BYTES_VALUE];
@@ -87,16 +87,16 @@ typedef struct SOCKET_IO_INSTANCE_TAG
 
 typedef struct NETWORK_INTERFACE_DESCRIPTION_TAG
 {
-    char* name;
-    char* mac_address;
-    char* ip_address;
-    struct NETWORK_INTERFACE_DESCRIPTION_TAG* next;
+    char *name;
+    char *mac_address;
+    char *ip_address;
+    struct NETWORK_INTERFACE_DESCRIPTION_TAG *next;
 } NETWORK_INTERFACE_DESCRIPTION;
 
 /*this function will clone an option given by name and value*/
-static void* socketio_CloneOption(const char* name, const void* value)
+static void *socketio_CloneOption(const char *name, const void *value)
 {
-    void* result;
+    void *result;
 
     if (name != NULL)
     {
@@ -110,11 +110,11 @@ static void* socketio_CloneOption(const char* name, const void* value)
             }
             else
             {
-                if ((result = malloc(sizeof(char) * (strlen((char*)value) + 1))) == NULL)
+                if ((result = malloc(sizeof(char) * (strlen((char *)value) + 1))) == NULL)
                 {
                     LogError("Failed cloning option %s (malloc failed)", name);
                 }
-                else if (strcpy((char*)result, (char*)value) == NULL)
+                else if (strcpy((char *)result, (char *)value) == NULL)
                 {
                     LogError("Failed cloning option %s (strcpy failed)", name);
                     free(result);
@@ -135,13 +135,13 @@ static void* socketio_CloneOption(const char* name, const void* value)
 }
 
 /*this function destroys an option previously created*/
-static void socketio_DestroyOption(const char* name, const void* value)
+static void socketio_DestroyOption(const char *name, const void *value)
 {
     if (name != NULL)
     {
         if (strcmp(name, OPTION_NET_INT_MAC_ADDRESS) == 0 && value != NULL)
         {
-            free((void*)value);
+            free((void *)value);
         }
     }
 }
@@ -157,7 +157,7 @@ static OPTIONHANDLER_HANDLE socketio_retrieveoptions(CONCRETE_IO_HANDLE handle)
     }
     else
     {
-        SOCKET_IO_INSTANCE* socket_io_instance = (SOCKET_IO_INSTANCE*)handle;
+        SOCKET_IO_INSTANCE *socket_io_instance = (SOCKET_IO_INSTANCE *)handle;
 
         result = OptionHandler_Create(socketio_CloneOption, socketio_DestroyOption, socketio_setoption);
         if (result == NULL)
@@ -165,7 +165,7 @@ static OPTIONHANDLER_HANDLE socketio_retrieveoptions(CONCRETE_IO_HANDLE handle)
             LogError("unable to OptionHandler_Create");
         }
         else if (socket_io_instance->target_mac_address != NULL &&
-            OptionHandler_AddOption(result, OPTION_NET_INT_MAC_ADDRESS, socket_io_instance->target_mac_address) != OPTIONHANDLER_OK)
+                 OptionHandler_AddOption(result, OPTION_NET_INT_MAC_ADDRESS, socket_io_instance->target_mac_address) != OPTIONHANDLER_OK)
         {
             LogError("failed retrieving options (failed adding net_interface_mac_address)");
             OptionHandler_Destroy(result);
@@ -177,18 +177,17 @@ static OPTIONHANDLER_HANDLE socketio_retrieveoptions(CONCRETE_IO_HANDLE handle)
 }
 
 static const IO_INTERFACE_DESCRIPTION socket_io_interface_description =
-{
-    socketio_retrieveoptions,
-    socketio_create,
-    socketio_destroy,
-    socketio_open,
-    socketio_close,
-    socketio_send,
-    socketio_dowork,
-    socketio_setoption
-};
+    {
+        socketio_retrieveoptions,
+        socketio_create,
+        socketio_destroy,
+        socketio_open,
+        socketio_close,
+        socketio_send,
+        socketio_dowork,
+        socketio_setoption};
 
-static void indicate_error(SOCKET_IO_INSTANCE* socket_io_instance)
+static void indicate_error(SOCKET_IO_INSTANCE *socket_io_instance)
 {
     socket_io_instance->io_state = IO_STATE_ERROR;
     if (socket_io_instance->on_io_error != NULL)
@@ -197,22 +196,22 @@ static void indicate_error(SOCKET_IO_INSTANCE* socket_io_instance)
     }
 }
 
-static int add_pending_io(SOCKET_IO_INSTANCE* socket_io_instance, const unsigned char* buffer, size_t size, ON_SEND_COMPLETE on_send_complete, void* callback_context)
+static int add_pending_io(SOCKET_IO_INSTANCE *socket_io_instance, const unsigned char *buffer, size_t size, ON_SEND_COMPLETE on_send_complete, void *callback_context)
 {
     int result;
-    PENDING_SOCKET_IO* pending_socket_io = (PENDING_SOCKET_IO*)malloc(sizeof(PENDING_SOCKET_IO));
+    PENDING_SOCKET_IO *pending_socket_io = (PENDING_SOCKET_IO *)malloc(sizeof(PENDING_SOCKET_IO));
     if (pending_socket_io == NULL)
     {
-        result = __FAILURE__;
+        result = MU_FAILURE;
     }
     else
     {
-        pending_socket_io->bytes = (unsigned char*)malloc(size);
+        pending_socket_io->bytes = (unsigned char *)malloc(size);
         if (pending_socket_io->bytes == NULL)
         {
             LogError("Allocation Failure: Unable to allocate pending list.");
             free(pending_socket_io);
-            result = __FAILURE__;
+            result = MU_FAILURE;
         }
         else
         {
@@ -227,7 +226,7 @@ static int add_pending_io(SOCKET_IO_INSTANCE* socket_io_instance, const unsigned
                 LogError("Failure: Unable to add socket to pending list.");
                 free(pending_socket_io->bytes);
                 free(pending_socket_io);
-                result = __FAILURE__;
+                result = MU_FAILURE;
             }
             else
             {
@@ -244,16 +243,16 @@ static STATIC_VAR_UNUSED void signal_callback(int signum)
     LogError("Socket received signal %d.", signum);
 }
 
-static int lookup_address_and_initiate_socket_connection(SOCKET_IO_INSTANCE* socket_io_instance)
+static int lookup_address_and_initiate_socket_connection(SOCKET_IO_INSTANCE *socket_io_instance)
 {
     int result;
     int err;
 
     struct addrinfo addrInfoHintIp;
     struct sockaddr_un addrInfoUn;
-    struct sockaddr* connect_addr = NULL;
+    struct sockaddr *connect_addr = NULL;
     socklen_t connect_addr_len;
-    struct addrinfo* addrInfoIp = NULL;
+    struct addrinfo *addrInfoIp = NULL;
 
     if (socket_io_instance->address_type == ADDRESS_TYPE_IP)
     {
@@ -268,7 +267,7 @@ static int lookup_address_and_initiate_socket_connection(SOCKET_IO_INSTANCE* soc
         if (err != 0)
         {
             LogError("Failure: getaddrinfo failure %d.", err);
-            result = __FAILURE__;
+            result = MU_FAILURE;
         }
         else
         {
@@ -282,8 +281,8 @@ static int lookup_address_and_initiate_socket_connection(SOCKET_IO_INSTANCE* soc
         size_t hostname_len = strlen(socket_io_instance->hostname);
         if (hostname_len + 1 > sizeof(addrInfoUn.sun_path))
         {
-            LogError("Hostname %s is too long for a unix socket (max len = %zu)", socket_io_instance->hostname, sizeof(addrInfoUn.sun_path));
-            result = __FAILURE__;
+            LogError("Hostname %s is too long for a unix socket (max len = %lu)", socket_io_instance->hostname, (unsigned long)sizeof(addrInfoUn.sun_path));
+            result = MU_FAILURE;
         }
         else
         {
@@ -292,7 +291,7 @@ static int lookup_address_and_initiate_socket_connection(SOCKET_IO_INSTANCE* soc
             // No need to add NULL terminator due to the above memset
             (void)memcpy(addrInfoUn.sun_path, socket_io_instance->hostname, hostname_len);
 
-            connect_addr = (struct sockaddr*)&addrInfoUn;
+            connect_addr = (struct sockaddr *)&addrInfoUn;
             connect_addr_len = sizeof(addrInfoUn);
             result = 0;
         }
@@ -306,7 +305,7 @@ static int lookup_address_and_initiate_socket_connection(SOCKET_IO_INSTANCE* soc
             (fcntl(socket_io_instance->socket, F_SETFL, flags | O_NONBLOCK) == -1))
         {
             LogError("Failure: fcntl failure.");
-            result = __FAILURE__;
+            result = MU_FAILURE;
         }
         else
         {
@@ -314,7 +313,7 @@ static int lookup_address_and_initiate_socket_connection(SOCKET_IO_INSTANCE* soc
             if ((err != 0) && (errno != EINPROGRESS))
             {
                 LogError("Failure: connect failure %d.", errno);
-                result = __FAILURE__;
+                result = MU_FAILURE;
             }
         }
     }
@@ -327,7 +326,7 @@ static int lookup_address_and_initiate_socket_connection(SOCKET_IO_INSTANCE* soc
     return result;
 }
 
-static int wait_for_connection(SOCKET_IO_INSTANCE* socket_io_instance)
+static int wait_for_connection(SOCKET_IO_INSTANCE *socket_io_instance)
 {
     int result;
     int err;
@@ -355,7 +354,7 @@ static int wait_for_connection(SOCKET_IO_INSTANCE* socket_io_instance)
     if (retval != 1)
     {
         LogError("Failure: select failure.");
-        result = __FAILURE__;
+        result = MU_FAILURE;
     }
     else
     {
@@ -365,13 +364,13 @@ static int wait_for_connection(SOCKET_IO_INSTANCE* socket_io_instance)
         if (err != 0)
         {
             LogError("Failure: getsockopt failure %d.", errno);
-            result = __FAILURE__;
+            result = MU_FAILURE;
         }
         else if (so_error != 0)
         {
             err = so_error;
             LogError("Failure: connect failure %d.", so_error);
-            result = __FAILURE__;
+            result = MU_FAILURE;
         }
         else
         {
@@ -382,10 +381,8 @@ static int wait_for_connection(SOCKET_IO_INSTANCE* socket_io_instance)
     return result;
 }
 
-
-
 #ifndef __APPLE__
-static void destroy_network_interface_descriptions(NETWORK_INTERFACE_DESCRIPTION* nid)
+static void destroy_network_interface_descriptions(NETWORK_INTERFACE_DESCRIPTION *nid)
 {
     if (nid != NULL)
     {
@@ -413,15 +410,15 @@ static void destroy_network_interface_descriptions(NETWORK_INTERFACE_DESCRIPTION
     }
 }
 
-static NETWORK_INTERFACE_DESCRIPTION* create_network_interface_description(struct ifreq *ifr, NETWORK_INTERFACE_DESCRIPTION* previous_nid)
+static NETWORK_INTERFACE_DESCRIPTION *create_network_interface_description(struct ifreq *ifr, NETWORK_INTERFACE_DESCRIPTION *previous_nid)
 {
-    NETWORK_INTERFACE_DESCRIPTION* result;
+    NETWORK_INTERFACE_DESCRIPTION *result;
 
-    if ((result = (NETWORK_INTERFACE_DESCRIPTION*)malloc(sizeof(NETWORK_INTERFACE_DESCRIPTION))) == NULL)
+    if ((result = (NETWORK_INTERFACE_DESCRIPTION *)malloc(sizeof(NETWORK_INTERFACE_DESCRIPTION))) == NULL)
     {
         LogError("Failed allocating NETWORK_INTERFACE_DESCRIPTION");
     }
-    else if ((result->name = (char*)malloc(sizeof(char) * (strlen(ifr->ifr_name) + 1))) == NULL)
+    else if ((result->name = (char *)malloc(sizeof(char) * (strlen(ifr->ifr_name) + 1))) == NULL)
     {
         LogError("failed setting interface description name (malloc failed)");
         destroy_network_interface_descriptions(result);
@@ -435,28 +432,28 @@ static NETWORK_INTERFACE_DESCRIPTION* create_network_interface_description(struc
     }
     else
     {
-        char* ip_address;
-        unsigned char* mac = (unsigned char*)ifr->ifr_hwaddr.sa_data;
+        char *ip_address;
+        unsigned char *mac = (unsigned char *)ifr->ifr_hwaddr.sa_data;
 
-        if ((result->mac_address = (char*)malloc(sizeof(char) * MAC_ADDRESS_STRING_LENGTH)) == NULL)
+        if ((result->mac_address = (char *)malloc(sizeof(char) * MAC_ADDRESS_STRING_LENGTH)) == NULL)
         {
             LogError("failed formatting mac address (malloc failed)");
             destroy_network_interface_descriptions(result);
             result = NULL;
         }
-        else if (sprintf(result->mac_address, "%02X:%02X:%02X:%02X:%02X:%02X", mac[0],mac[1],mac[2],mac[3],mac[4],mac[5]) <= 0)
+        else if (sprintf(result->mac_address, "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]) <= 0)
         {
             LogError("failed formatting mac address (sprintf failed)");
             destroy_network_interface_descriptions(result);
             result = NULL;
         }
-        else if ((ip_address = inet_ntoa(((struct sockaddr_in*)&ifr->ifr_addr)->sin_addr)) == NULL)
+        else if ((ip_address = inet_ntoa(((struct sockaddr_in *)&ifr->ifr_addr)->sin_addr)) == NULL)
         {
             LogError("failed setting the ip address (inet_ntoa failed)");
             destroy_network_interface_descriptions(result);
             result = NULL;
         }
-        else if ((result->ip_address = (char*)malloc(sizeof(char) * (strlen(ip_address) + 1))) == NULL)
+        else if ((result->ip_address = (char *)malloc(sizeof(char) * (strlen(ip_address) + 1))) == NULL)
         {
             LogError("failed setting the ip address (malloc failed)");
             destroy_network_interface_descriptions(result);
@@ -482,7 +479,7 @@ static NETWORK_INTERFACE_DESCRIPTION* create_network_interface_description(struc
     return result;
 }
 
-static int get_network_interface_descriptions(int socket, NETWORK_INTERFACE_DESCRIPTION** nid)
+static int get_network_interface_descriptions(int socket, NETWORK_INTERFACE_DESCRIPTION **nid)
 {
     int result;
 
@@ -496,15 +493,15 @@ static int get_network_interface_descriptions(int socket, NETWORK_INTERFACE_DESC
     if (ioctl(socket, SIOCGIFCONF, &ifc) == -1)
     {
         LogError("ioctl failed querying socket (SIOCGIFCONF, errno=%d)", errno);
-        result = __FAILURE__;
+        result = MU_FAILURE;
     }
     else
     {
-        NETWORK_INTERFACE_DESCRIPTION* root_nid = NULL;
-        NETWORK_INTERFACE_DESCRIPTION* new_nid = NULL;
+        NETWORK_INTERFACE_DESCRIPTION *root_nid = NULL;
+        NETWORK_INTERFACE_DESCRIPTION *new_nid = NULL;
 
-        struct ifreq* it = ifc.ifc_req;
-        const struct ifreq* const end = it + (ifc.ifc_len / sizeof(struct ifreq));
+        struct ifreq *it = ifc.ifc_req;
+        const struct ifreq *const end = it + (ifc.ifc_len / sizeof(struct ifreq));
 
         result = 0;
 
@@ -515,25 +512,25 @@ static int get_network_interface_descriptions(int socket, NETWORK_INTERFACE_DESC
             if (ioctl(socket, SIOCGIFFLAGS, &ifr) != 0)
             {
                 LogError("ioctl failed querying socket (SIOCGIFFLAGS, errno=%d)", errno);
-                result = __FAILURE__;
+                result = MU_FAILURE;
                 break;
             }
             else if (ioctl(socket, SIOCGIFHWADDR, &ifr) != 0)
             {
                 LogError("ioctl failed querying socket (SIOCGIFHWADDR, errno=%d)", errno);
-                result = __FAILURE__;
+                result = MU_FAILURE;
                 break;
             }
             else if (ioctl(socket, SIOCGIFADDR, &ifr) != 0)
             {
                 LogError("ioctl failed querying socket (SIOCGIFADDR, errno=%d)", errno);
-                result = __FAILURE__;
+                result = MU_FAILURE;
                 break;
             }
             else if ((new_nid = create_network_interface_description(&ifr, new_nid)) == NULL)
             {
                 LogError("Failed creating network interface description");
-                result = __FAILURE__;
+                result = MU_FAILURE;
                 break;
             }
             else if (root_nid == NULL)
@@ -555,21 +552,21 @@ static int get_network_interface_descriptions(int socket, NETWORK_INTERFACE_DESC
     return result;
 }
 
-static int set_target_network_interface(int socket, char* mac_address)
+static int set_target_network_interface(int socket, char *mac_address)
 {
     int result;
-    NETWORK_INTERFACE_DESCRIPTION* nid;
+    NETWORK_INTERFACE_DESCRIPTION *nid;
 
     if (get_network_interface_descriptions(socket, &nid) != 0)
     {
         LogError("Failed getting network interface descriptions");
-        result = __FAILURE__;
+        result = MU_FAILURE;
     }
     else
     {
-        NETWORK_INTERFACE_DESCRIPTION* current_nid = nid;
+        NETWORK_INTERFACE_DESCRIPTION *current_nid = nid;
 
-        while(current_nid != NULL)
+        while (current_nid != NULL)
         {
             if (strcmp(mac_address, current_nid->mac_address) == 0)
             {
@@ -582,12 +579,12 @@ static int set_target_network_interface(int socket, char* mac_address)
         if (current_nid == NULL)
         {
             LogError("Did not find a network interface matching MAC ADDRESS");
-            result = __FAILURE__;
+            result = MU_FAILURE;
         }
         else if (setsockopt(socket, SOL_SOCKET, SO_BINDTODEVICE, current_nid->name, strlen(current_nid->name)) != 0)
         {
             LogError("setsockopt failed (%d)", errno);
-            result = __FAILURE__;
+            result = MU_FAILURE;
         }
         else
         {
@@ -601,10 +598,10 @@ static int set_target_network_interface(int socket, char* mac_address)
 }
 #endif //__APPLE__
 
-CONCRETE_IO_HANDLE socketio_create(void* io_create_parameters)
+CONCRETE_IO_HANDLE socketio_create(void *io_create_parameters)
 {
-    SOCKETIO_CONFIG* socket_io_config = io_create_parameters;
-    SOCKET_IO_INSTANCE* result;
+    SOCKETIO_CONFIG *socket_io_config = io_create_parameters;
+    SOCKET_IO_INSTANCE *result;
 
     if (socket_io_config == NULL)
     {
@@ -628,7 +625,7 @@ CONCRETE_IO_HANDLE socketio_create(void* io_create_parameters)
             {
                 if (socket_io_config->hostname != NULL)
                 {
-                    result->hostname = (char*)malloc(strlen(socket_io_config->hostname) + 1);
+                    result->hostname = (char *)malloc(strlen(socket_io_config->hostname) + 1);
                     if (result->hostname != NULL)
                     {
                         (void)strcpy(result->hostname, socket_io_config->hostname);
@@ -639,7 +636,7 @@ CONCRETE_IO_HANDLE socketio_create(void* io_create_parameters)
                 else
                 {
                     result->hostname = NULL;
-                    result->socket = *((int*)socket_io_config->accepted_socket);
+                    result->socket = *((int *)socket_io_config->accepted_socket);
                 }
 
                 if ((result->hostname == NULL) && (result->socket == INVALID_SOCKET))
@@ -674,7 +671,7 @@ void socketio_destroy(CONCRETE_IO_HANDLE socket_io)
 {
     if (socket_io != NULL)
     {
-        SOCKET_IO_INSTANCE* socket_io_instance = (SOCKET_IO_INSTANCE*)socket_io;
+        SOCKET_IO_INSTANCE *socket_io_instance = (SOCKET_IO_INSTANCE *)socket_io;
         /* we cannot do much if the close fails, so just ignore the result */
         if (socket_io_instance->socket != INVALID_SOCKET)
         {
@@ -685,7 +682,7 @@ void socketio_destroy(CONCRETE_IO_HANDLE socket_io)
         LIST_ITEM_HANDLE first_pending_io = singlylinkedlist_get_head_item(socket_io_instance->pending_io_list);
         while (first_pending_io != NULL)
         {
-            PENDING_SOCKET_IO* pending_socket_io = (PENDING_SOCKET_IO*)singlylinkedlist_item_get_value(first_pending_io);
+            PENDING_SOCKET_IO *pending_socket_io = (PENDING_SOCKET_IO *)singlylinkedlist_item_get_value(first_pending_io);
             if (pending_socket_io != NULL)
             {
                 free(pending_socket_io->bytes);
@@ -703,22 +700,22 @@ void socketio_destroy(CONCRETE_IO_HANDLE socket_io)
     }
 }
 
-int socketio_open(CONCRETE_IO_HANDLE socket_io, ON_IO_OPEN_COMPLETE on_io_open_complete, void* on_io_open_complete_context, ON_BYTES_RECEIVED on_bytes_received, void* on_bytes_received_context, ON_IO_ERROR on_io_error, void* on_io_error_context)
+int socketio_open(CONCRETE_IO_HANDLE socket_io, ON_IO_OPEN_COMPLETE on_io_open_complete, void *on_io_open_complete_context, ON_BYTES_RECEIVED on_bytes_received, void *on_bytes_received_context, ON_IO_ERROR on_io_error, void *on_io_error_context)
 {
     int result;
 
-    SOCKET_IO_INSTANCE* socket_io_instance = (SOCKET_IO_INSTANCE*)socket_io;
+    SOCKET_IO_INSTANCE *socket_io_instance = (SOCKET_IO_INSTANCE *)socket_io;
     if (socket_io == NULL)
     {
         LogError("Invalid argument: SOCKET_IO_INSTANCE is NULL");
-        result = __FAILURE__;
+        result = MU_FAILURE;
     }
     else
     {
         if (socket_io_instance->io_state != IO_STATE_CLOSED)
         {
             LogError("Failure: socket state is not closed.");
-            result = __FAILURE__;
+            result = MU_FAILURE;
         }
         else if (socket_io_instance->socket != INVALID_SOCKET)
         {
@@ -734,18 +731,18 @@ int socketio_open(CONCRETE_IO_HANDLE socket_io, ON_IO_OPEN_COMPLETE on_io_open_c
         }
         else
         {
-            socket_io_instance->socket = socket (socket_io_instance->address_type == ADDRESS_TYPE_IP ? AF_INET : AF_UNIX, SOCK_STREAM, 0);
+            socket_io_instance->socket = socket(socket_io_instance->address_type == ADDRESS_TYPE_IP ? AF_INET : AF_UNIX, SOCK_STREAM, 0);
             if (socket_io_instance->socket < SOCKET_SUCCESS)
             {
                 LogError("Failure: socket create failure %d.", socket_io_instance->socket);
-                result = __FAILURE__;
+                result = MU_FAILURE;
             }
 #ifndef __APPLE__
             else if (socket_io_instance->target_mac_address != NULL &&
                      set_target_network_interface(socket_io_instance->socket, socket_io_instance->target_mac_address) != 0)
             {
                 LogError("Failure: failed selecting target network interface (MACADDR=%s).", socket_io_instance->target_mac_address);
-                result = __FAILURE__;
+                result = MU_FAILURE;
             }
 #endif //__APPLE__
             else if ((result = lookup_address_and_initiate_socket_connection(socket_io_instance)) != 0)
@@ -786,17 +783,17 @@ int socketio_open(CONCRETE_IO_HANDLE socket_io, ON_IO_OPEN_COMPLETE on_io_open_c
     return result;
 }
 
-int socketio_close(CONCRETE_IO_HANDLE socket_io, ON_IO_CLOSE_COMPLETE on_io_close_complete, void* callback_context)
+int socketio_close(CONCRETE_IO_HANDLE socket_io, ON_IO_CLOSE_COMPLETE on_io_close_complete, void *callback_context)
 {
     int result = 0;
 
     if (socket_io == NULL)
     {
-        result = __FAILURE__;
+        result = MU_FAILURE;
     }
     else
     {
-        SOCKET_IO_INSTANCE* socket_io_instance = (SOCKET_IO_INSTANCE*)socket_io;
+        SOCKET_IO_INSTANCE *socket_io_instance = (SOCKET_IO_INSTANCE *)socket_io;
         if ((socket_io_instance->io_state != IO_STATE_CLOSED) && (socket_io_instance->io_state != IO_STATE_CLOSING))
         {
             // Only close if the socket isn't already in the closed or closing state
@@ -817,7 +814,7 @@ int socketio_close(CONCRETE_IO_HANDLE socket_io, ON_IO_CLOSE_COMPLETE on_io_clos
     return result;
 }
 
-int socketio_send(CONCRETE_IO_HANDLE socket_io, const void* buffer, size_t size, ON_SEND_COMPLETE on_send_complete, void* callback_context)
+int socketio_send(CONCRETE_IO_HANDLE socket_io, const void *buffer, size_t size, ON_SEND_COMPLETE on_send_complete, void *callback_context)
 {
     int result;
 
@@ -827,15 +824,15 @@ int socketio_send(CONCRETE_IO_HANDLE socket_io, const void* buffer, size_t size,
     {
         /* Invalid arguments */
         LogError("Invalid argument: send given invalid parameter");
-        result = __FAILURE__;
+        result = MU_FAILURE;
     }
     else
     {
-        SOCKET_IO_INSTANCE* socket_io_instance = (SOCKET_IO_INSTANCE*)socket_io;
+        SOCKET_IO_INSTANCE *socket_io_instance = (SOCKET_IO_INSTANCE *)socket_io;
         if (socket_io_instance->io_state != IO_STATE_OPEN)
         {
             LogError("Failure: socket state is not opened.");
-            result = __FAILURE__;
+            result = MU_FAILURE;
         }
         else
         {
@@ -845,7 +842,7 @@ int socketio_send(CONCRETE_IO_HANDLE socket_io, const void* buffer, size_t size,
                 if (add_pending_io(socket_io_instance, buffer, size, on_send_complete, callback_context) != 0)
                 {
                     LogError("Failure: add_pending_io failed.");
-                    result = __FAILURE__;
+                    result = MU_FAILURE;
                 }
                 else
                 {
@@ -869,7 +866,7 @@ int socketio_send(CONCRETE_IO_HANDLE socket_io, const void* buffer, size_t size,
                         else
                         {
                             LogError("Failure: sending socket failed. errno=%d (%s).", errno, strerror(errno));
-                            result = __FAILURE__;
+                            result = MU_FAILURE;
                         }
                     }
                     else
@@ -878,7 +875,7 @@ int socketio_send(CONCRETE_IO_HANDLE socket_io, const void* buffer, size_t size,
                         if (add_pending_io(socket_io_instance, buffer + send_result, size - send_result, on_send_complete, callback_context) != 0)
                         {
                             LogError("Failure: add_pending_io failed.");
-                            result = __FAILURE__;
+                            result = MU_FAILURE;
                         }
                         else
                         {
@@ -906,11 +903,11 @@ void socketio_dowork(CONCRETE_IO_HANDLE socket_io)
 {
     if (socket_io != NULL)
     {
-        SOCKET_IO_INSTANCE* socket_io_instance = (SOCKET_IO_INSTANCE*)socket_io;
+        SOCKET_IO_INSTANCE *socket_io_instance = (SOCKET_IO_INSTANCE *)socket_io;
         LIST_ITEM_HANDLE first_pending_io = singlylinkedlist_get_head_item(socket_io_instance->pending_io_list);
         while (first_pending_io != NULL)
         {
-            PENDING_SOCKET_IO* pending_socket_io = (PENDING_SOCKET_IO*)singlylinkedlist_item_get_value(first_pending_io);
+            PENDING_SOCKET_IO *pending_socket_io = (PENDING_SOCKET_IO *)singlylinkedlist_item_get_value(first_pending_io);
             if (pending_socket_io == NULL)
             {
                 indicate_error(socket_io_instance);
@@ -1003,7 +1000,7 @@ void socketio_dowork(CONCRETE_IO_HANDLE socket_io)
 #endif
 
 #ifndef __APPLE__
-static void strtoup(char* str)
+static void strtoup(char *str)
 {
     if (str != NULL)
     {
@@ -1019,14 +1016,14 @@ static void strtoup(char* str)
 }
 #endif // __APPLE__
 
-static int socketio_setaddresstype_option(SOCKET_IO_INSTANCE* socket_io_instance, const char* addressType)
+static int socketio_setaddresstype_option(SOCKET_IO_INSTANCE *socket_io_instance, const char *addressType)
 {
     int result;
 
     if (socket_io_instance->io_state != IO_STATE_CLOSED)
     {
         LogError("Socket's type can only be changed when in state 'IO_STATE_CLOSED'.  Current state=%d", socket_io_instance->io_state);
-        result = __FAILURE__;
+        result = MU_FAILURE;
     }
     else if (strcmp(addressType, OPTION_ADDRESS_TYPE_DOMAIN_SOCKET) == 0)
     {
@@ -1041,13 +1038,13 @@ static int socketio_setaddresstype_option(SOCKET_IO_INSTANCE* socket_io_instance
     else
     {
         LogError("Address type %s is not supported", addressType);
-        result = __FAILURE__;
+        result = MU_FAILURE;
     }
 
     return result;
 }
 
-int socketio_setoption(CONCRETE_IO_HANDLE socket_io, const char* optionName, const void* value)
+int socketio_setoption(CONCRETE_IO_HANDLE socket_io, const char *optionName, const void *value)
 {
     int result;
 
@@ -1055,16 +1052,17 @@ int socketio_setoption(CONCRETE_IO_HANDLE socket_io, const char* optionName, con
         optionName == NULL ||
         value == NULL)
     {
-        result = __FAILURE__;
+        result = MU_FAILURE;
     }
     else
     {
-        SOCKET_IO_INSTANCE* socket_io_instance = (SOCKET_IO_INSTANCE*)socket_io;
+        SOCKET_IO_INSTANCE *socket_io_instance = (SOCKET_IO_INSTANCE *)socket_io;
 
         if (strcmp(optionName, "tcp_keepalive") == 0)
         {
             result = setsockopt(socket_io_instance->socket, SOL_SOCKET, SO_KEEPALIVE, value, sizeof(int));
-            if (result == -1) result = errno;
+            if (result == -1)
+                result = errno;
         }
         else if (strcmp(optionName, "tcp_keepalive_time") == 0)
         {
@@ -1073,35 +1071,37 @@ int socketio_setoption(CONCRETE_IO_HANDLE socket_io, const char* optionName, con
 #else
             result = setsockopt(socket_io_instance->socket, SOL_TCP, TCP_KEEPIDLE, value, sizeof(int));
 #endif
-            if (result == -1) result = errno;
+            if (result == -1)
+                result = errno;
         }
         else if (strcmp(optionName, "tcp_keepalive_interval") == 0)
         {
             result = setsockopt(socket_io_instance->socket, SOL_TCP, TCP_KEEPINTVL, value, sizeof(int));
-            if (result == -1) result = errno;
+            if (result == -1)
+                result = errno;
         }
         else if (strcmp(optionName, OPTION_NET_INT_MAC_ADDRESS) == 0)
         {
 #ifdef __APPLE__
             LogError("option not supported.");
-            result = __FAILURE__;
+            result = MU_FAILURE;
 #else
             if (strlen(value) == 0)
             {
                 LogError("option value must be a valid mac address");
-                result = __FAILURE__;
+                result = MU_FAILURE;
             }
-            else if ((socket_io_instance->target_mac_address = (char*)malloc(sizeof(char) * (strlen(value) + 1))) == NULL)
+            else if ((socket_io_instance->target_mac_address = (char *)malloc(sizeof(char) * (strlen(value) + 1))) == NULL)
             {
                 LogError("failed setting net_interface_mac_address option (malloc failed)");
-                result = __FAILURE__;
+                result = MU_FAILURE;
             }
             else if (strcpy(socket_io_instance->target_mac_address, value) == NULL)
             {
                 LogError("failed setting net_interface_mac_address option (strcpy failed)");
                 free(socket_io_instance->target_mac_address);
                 socket_io_instance->target_mac_address = NULL;
-                result = __FAILURE__;
+                result = MU_FAILURE;
             }
             else
             {
@@ -1112,23 +1112,18 @@ int socketio_setoption(CONCRETE_IO_HANDLE socket_io, const char* optionName, con
         }
         else if (strcmp(optionName, OPTION_ADDRESS_TYPE) == 0)
         {
-            result = socketio_setaddresstype_option(socket_io_instance, (const char*)value);
-        }
-        else if (strcmp(optionName, "underlying_io_options") == 0)
-        {
-            result = 0;
+            result = socketio_setaddresstype_option(socket_io_instance, (const char *)value);
         }
         else
         {
-            result = __FAILURE__;
+            result = MU_FAILURE;
         }
     }
 
     return result;
 }
 
-const IO_INTERFACE_DESCRIPTION* socketio_get_interface_description(void)
+const IO_INTERFACE_DESCRIPTION *socketio_get_interface_description(void)
 {
     return &socket_io_interface_description;
 }
-

@@ -16,12 +16,12 @@ int platform_init(void)
     if (SNTP_SetServerName(ntpServer) != 0)
     {
         LogError("Failed SNTP_SetServerName");
-        return __FAILURE__;
+        return MU_FAILURE;
     }
     if (SNTP_Init() != 0)
     {
         LogError("Failed SNTP_Init");
-        return __FAILURE__;
+        return MU_FAILURE;
     }
 
     return 0;
@@ -33,8 +33,11 @@ const IO_INTERFACE_DESCRIPTION *platform_get_default_tlsio(void)
     return tlsio_mbedtls_get_interface_description();
 }
 
-STRING_HANDLE platform_get_platform_info(void)
+STRING_HANDLE platform_get_platform_info(PLATFORM_INFO_OPTION options)
 {
+    // No applicable options, so ignoring parameter
+    (void)options;
+
     return STRING_construct("(openssl_compact)");
 }
 
