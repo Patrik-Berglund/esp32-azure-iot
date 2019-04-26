@@ -3,7 +3,7 @@
 #
  
 # Component configuration in preprocessor defines
-CFLAGS += -DUSE_LWIP_SOCKET_FOR_AZURE_IOT -Duse_amqp=OFF -Duse_http=OFF -DHSM_TYPE_SYMM_KEY
+CFLAGS += -DUSE_LWIP_SOCKET_FOR_AZURE_IOT -Duse_amqp=OFF -Duse_http=OFF -DHSM_TYPE_SYMM_KEY -DUSE_PROV_MODULE
 CFLAGS += -Wno-unused-function -Wno-missing-braces -Wno-missing-field-initializers
 
 COMPONENT_ADD_INCLUDEDIRS := \
@@ -104,6 +104,7 @@ azure-iot-sdk-c/provisioning_client/src/prov_auth_client.o \
 azure-iot-sdk-c/provisioning_client/src/prov_device_ll_client.o \
 azure-iot-sdk-c/provisioning_client/src/prov_security_factory.o \
 azure-iot-sdk-c/provisioning_client/src/iothub_security_factory.o \
+azure-iot-sdk-c/provisioning_client/src/iothub_auth_client.o \
 azure-iot-sdk-c/provisioning_client/src/prov_transport_mqtt_client.o \
 azure-iot-sdk-c/provisioning_client/src/prov_transport_mqtt_common.o \
 azure-iot-sdk-c/provisioning_client/adapters/hsm_client_data.o \

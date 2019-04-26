@@ -39,7 +39,10 @@ typedef struct CLIENT_SAMPLE_INFO_TAG
 static const char *global_prov_uri = "";
 static const char *id_scope = "";
 static const char *registration_name = "";
-static const char *symmetric_key = "";
+static const char *primary_key = "";
+static const char *secondary_key = "";
+
+static char *conn_str = NULL;
 
 MU_DEFINE_ENUM_STRINGS(PROV_DEVICE_RESULT, PROV_DEVICE_RESULT_VALUE);
 MU_DEFINE_ENUM_STRINGS(PROV_DEVICE_REG_STATUS, PROV_DEVICE_REG_STATUS_VALUES);
@@ -80,27 +83,35 @@ static void connection_status_callback(IOTHUB_CLIENT_CONNECTION_STATUS status, I
 
 static void register_device_callback(PROV_DEVICE_RESULT register_result, const char *iothub_uri, const char *device_id, void *user_context)
 {
-    (void)printf("Registration result: %s\r\n", MU_ENUM_TO_STRING(PROV_DEVICE_RESULT, register_result));
+    ESP_LOGI(TAG, "Registration result: %s", MU_ENUM_TO_STRING(PROV_DEVICE_RESULT, register_result));
 
     CLIENT_SAMPLE_INFO *user_ctx = (CLIENT_SAMPLE_INFO *)user_context;
     if (register_result == PROV_DEVICE_RESULT_OK)
     {
-        (void)printf("\r\nRegistration Information received from service: %s, deviceId: %s\r\n", iothub_uri, device_id);
+        ESP_LOGI(TAG, "Registration Information received from service: %s, deviceId: %s", iothub_uri, device_id);
         (void)mallocAndStrcpy_s(&user_ctx->iothub_uri, iothub_uri);
         (void)mallocAndStrcpy_s(&user_ctx->device_id, device_id);
-        user_ctx->registration_complete = 1;
+
+        size_t len = snprintf(NULL, 0, "HostName=%s;DeviceId=%s;SharedAccessKey=%s", iothub_uri, device_id, primary_key);
+        conn_str = malloc((len + 2) * sizeof(char));
+        if (conn_str != NULL)
+        {
+            int pos = snprintf(conn_str, len + 1, "HostName=%s;DeviceId=%s;SharedAccessKey=%s", iothub_uri, device_id, primary_key);
+            conn_str[pos] = 0;
+
+            user_ctx->registration_complete = 1;
+            return;
+        }
     }
-    else
-    {
-        (void)printf("Failure encountered on registration %s\r\n", MU_ENUM_TO_STRING(PROV_DEVICE_RESULT, register_result));
-        user_ctx->registration_complete = 2;
-    }
+
+    ESP_LOGI(TAG, "Failure encountered on registration %s", MU_ENUM_TO_STRING(PROV_DEVICE_RESULT, register_result));
+    user_ctx->registration_complete = 2;
 }
 
 static void registration_status_callback(PROV_DEVICE_REG_STATUS reg_status, void *user_context)
 {
     (void)user_context;
-    (void)printf("Provisioning Status: %s\r\n", MU_ENUM_TO_STRING(PROV_DEVICE_REG_STATUS, reg_status));
+    ESP_LOGI(TAG, "Provisioning Status: %s", MU_ENUM_TO_STRING(PROV_DEVICE_REG_STATUS, reg_status));
 }
 
 int bootstrap_device(void)
@@ -111,27 +122,23 @@ int bootstrap_device(void)
     hsm_type = SECURE_DEVICE_TYPE_SYMMETRIC_KEY;
 
     (void)prov_dev_security_init(hsm_type);
-    prov_dev_set_symmetric_key_info(registration_name, symmetric_key);
+    prov_dev_set_symmetric_key_info(registration_name, primary_key);
 
     memset(&user_ctx, 0, sizeof(CLIENT_SAMPLE_INFO));
 
     PROV_DEVICE_LL_HANDLE handle;
     if ((handle = Prov_Device_LL_Create(global_prov_uri, id_scope, Prov_Device_MQTT_Protocol)) == NULL)
     {
-        (void)printf("failed calling Prov_Device_LL_Create\r\n");
+        ESP_LOGI(TAG, "failed calling Prov_Device_LL_Create");
     }
     else
     {
         Prov_Device_LL_SetOption(handle, PROV_OPTION_LOG_TRACE, &traceOn);
         Prov_Device_LL_SetOption(handle, OPTION_TRUSTED_CERT, certificates);
 
-        // This option sets the registration ID it overrides the registration ID that is
-        // set within the HSM so be cautious if setting this value
-        //Prov_Device_SetOption(prov_device_handle, PROV_REGISTRATION_ID, "[REGISTRATION ID]");
-
         if (Prov_Device_LL_Register_Device(handle, register_device_callback, &user_ctx, registration_status_callback, &user_ctx) != PROV_DEVICE_RESULT_OK)
         {
-            (void)printf("failed calling Prov_Device_LL_Register_Device\r\n");
+            ESP_LOGI(TAG, "failed calling Prov_Device_LL_Register_Device");
         }
         else
         {
@@ -141,7 +148,7 @@ int bootstrap_device(void)
                 ThreadAPI_Sleep(10);
             } while (user_ctx.registration_complete == 0);
 
-            success = 1;
+            success = (user_ctx.registration_complete == 1);
         }
         Prov_Device_LL_Destroy(handle);
     }
@@ -161,7 +168,7 @@ void iothub_client_sample_mqtt_run(void)
     }
     else if (bootstrap_device())
     {
-        if ((iotHubClientHandle = IoTHubDeviceClient_LL_CreateFromDeviceAuth(user_ctx.iothub_uri, user_ctx.device_id, MQTT_Protocol)) == NULL)
+        if ((iotHubClientHandle = IoTHubDeviceClient_LL_CreateFromConnectionString(conn_str, MQTT_Protocol)) == NULL)
         {
             ESP_LOGE(TAG, "iotHubClientHandle is NULL!");
         }
