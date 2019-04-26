@@ -19,19 +19,13 @@
 #include "esp_log.h"
 
 #include "certs.h"
-
 #include "azure_prov_client/prov_device_ll_client.h"
 #include "azure_prov_client/prov_security_factory.h"
 #include "azure_prov_client/prov_transport_mqtt_client.h"
 
-static const char *TAG = "IOTHUB";
-
 typedef struct CLIENT_SAMPLE_INFO_TAG
 {
-    unsigned int sleep_time;
     char *iothub_uri;
-    char *access_key_name;
-    char *device_key;
     char *device_id;
     int registration_complete;
 } CLIENT_SAMPLE_INFO;
@@ -42,13 +36,12 @@ static const char *registration_name = "";
 static const char *primary_key = "";
 static const char *secondary_key = "";
 
-static char *conn_str = NULL;
+static const char *TAG = "IOTHUB";
 static bool usePrimaryKey = true;
+CLIENT_SAMPLE_INFO user_ctx;
 
 MU_DEFINE_ENUM_STRINGS(PROV_DEVICE_RESULT, PROV_DEVICE_RESULT_VALUE);
 MU_DEFINE_ENUM_STRINGS(PROV_DEVICE_REG_STATUS, PROV_DEVICE_REG_STATUS_VALUES);
-
-CLIENT_SAMPLE_INFO user_ctx;
 
 static void connection_status_callback(IOTHUB_CLIENT_CONNECTION_STATUS status, IOTHUB_CLIENT_CONNECTION_STATUS_REASON reason, void *userContextCallback)
 {
@@ -108,21 +101,18 @@ static void registration_status_callback(PROV_DEVICE_REG_STATUS reg_status, void
     ESP_LOGI(TAG, "Provisioning Status: %s", MU_ENUM_TO_STRING(PROV_DEVICE_REG_STATUS, reg_status));
 }
 
-int bootstrap_device(void)
+bool bootstrap_device(void)
 {
-    int success = 0;
     bool traceOn = true;
-    SECURE_DEVICE_TYPE hsm_type;
-    hsm_type = SECURE_DEVICE_TYPE_SYMMETRIC_KEY;
+    PROV_DEVICE_LL_HANDLE handle;
 
-    while (user_ctx.registration_complete != 1)
+    do
     {
-        (void)prov_dev_security_init(hsm_type);
         memset(&user_ctx, 0, sizeof(CLIENT_SAMPLE_INFO));
 
+        prov_dev_security_init(SECURE_DEVICE_TYPE_SYMMETRIC_KEY);
         prov_dev_set_symmetric_key_info(registration_name, (usePrimaryKey) ? primary_key : secondary_key);
 
-        PROV_DEVICE_LL_HANDLE handle;
         if ((handle = Prov_Device_LL_Create(global_prov_uri, id_scope, Prov_Device_MQTT_Protocol)) == NULL)
         {
             ESP_LOGI(TAG, "failed calling Prov_Device_LL_Create");
@@ -154,7 +144,7 @@ int bootstrap_device(void)
             usePrimaryKey = !usePrimaryKey;
             prov_dev_security_deinit();
         }
-    }
+    } while (user_ctx.registration_complete != 1);
 
     return true;
 }
