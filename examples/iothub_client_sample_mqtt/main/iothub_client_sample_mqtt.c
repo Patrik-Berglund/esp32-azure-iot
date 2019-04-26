@@ -104,12 +104,13 @@ static void registration_status_callback(PROV_DEVICE_REG_STATUS reg_status, void
 bool bootstrap_device(void)
 {
     bool traceOn = true;
+    uint8_t timeout = 60;
     PROV_DEVICE_LL_HANDLE handle;
+
+    memset(&user_ctx, 0, sizeof(CLIENT_SAMPLE_INFO));
 
     do
     {
-        memset(&user_ctx, 0, sizeof(CLIENT_SAMPLE_INFO));
-
         prov_dev_security_init(SECURE_DEVICE_TYPE_SYMMETRIC_KEY);
         prov_dev_set_symmetric_key_info(registration_name, (usePrimaryKey) ? primary_key : secondary_key);
 
@@ -121,6 +122,7 @@ bool bootstrap_device(void)
         {
             Prov_Device_LL_SetOption(handle, PROV_OPTION_LOG_TRACE, &traceOn);
             Prov_Device_LL_SetOption(handle, OPTION_TRUSTED_CERT, certificates);
+            Prov_Device_LL_SetOption(handle, PROV_OPTION_TIMEOUT, &timeout);
 
             if (Prov_Device_LL_Register_Device(handle, register_device_callback, &user_ctx, registration_status_callback, &user_ctx) != PROV_DEVICE_RESULT_OK)
             {
@@ -139,10 +141,14 @@ bool bootstrap_device(void)
 
         if (user_ctx.registration_complete != 1)
         {
-            ThreadAPI_Sleep(10 * 1000);
+            ThreadAPI_Sleep(30 * 1000);
             ESP_LOGI(TAG, "Swapping key");
             usePrimaryKey = !usePrimaryKey;
             prov_dev_security_deinit();
+
+            free(user_ctx.device_id);
+            free(user_ctx.iothub_uri);
+            memset(&user_ctx, 0, sizeof(CLIENT_SAMPLE_INFO));
         }
     } while (user_ctx.registration_complete != 1);
 
