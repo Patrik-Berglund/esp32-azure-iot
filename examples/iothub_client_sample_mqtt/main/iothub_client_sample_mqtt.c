@@ -43,6 +43,7 @@ static const char *primary_key = "";
 static const char *secondary_key = "";
 
 static char *conn_str = NULL;
+static bool usePrimaryKey = true;
 
 MU_DEFINE_ENUM_STRINGS(PROV_DEVICE_RESULT, PROV_DEVICE_RESULT_VALUE);
 MU_DEFINE_ENUM_STRINGS(PROV_DEVICE_REG_STATUS, PROV_DEVICE_REG_STATUS_VALUES);
@@ -92,20 +93,13 @@ static void register_device_callback(PROV_DEVICE_RESULT register_result, const c
         (void)mallocAndStrcpy_s(&user_ctx->iothub_uri, iothub_uri);
         (void)mallocAndStrcpy_s(&user_ctx->device_id, device_id);
 
-        size_t len = snprintf(NULL, 0, "HostName=%s;DeviceId=%s;SharedAccessKey=%s", iothub_uri, device_id, primary_key);
-        conn_str = malloc((len + 2) * sizeof(char));
-        if (conn_str != NULL)
-        {
-            int pos = snprintf(conn_str, len + 1, "HostName=%s;DeviceId=%s;SharedAccessKey=%s", iothub_uri, device_id, primary_key);
-            conn_str[pos] = 0;
-
-            user_ctx->registration_complete = 1;
-            return;
-        }
+        user_ctx->registration_complete = 1;
     }
-
-    ESP_LOGI(TAG, "Failure encountered on registration %s", MU_ENUM_TO_STRING(PROV_DEVICE_RESULT, register_result));
-    user_ctx->registration_complete = 2;
+    else
+    {
+        ESP_LOGI(TAG, "Failure encountered on registration %s", MU_ENUM_TO_STRING(PROV_DEVICE_RESULT, register_result));
+        user_ctx->registration_complete = 2;
+    }
 }
 
 static void registration_status_callback(PROV_DEVICE_REG_STATUS reg_status, void *user_context)
@@ -121,41 +115,48 @@ int bootstrap_device(void)
     SECURE_DEVICE_TYPE hsm_type;
     hsm_type = SECURE_DEVICE_TYPE_SYMMETRIC_KEY;
 
-    (void)prov_dev_security_init(hsm_type);
-    prov_dev_set_symmetric_key_info(registration_name, primary_key);
-
-    memset(&user_ctx, 0, sizeof(CLIENT_SAMPLE_INFO));
-
-    PROV_DEVICE_LL_HANDLE handle;
-    if ((handle = Prov_Device_LL_Create(global_prov_uri, id_scope, Prov_Device_MQTT_Protocol)) == NULL)
+    while (user_ctx.registration_complete != 1)
     {
-        ESP_LOGI(TAG, "failed calling Prov_Device_LL_Create");
-    }
-    else
-    {
-        Prov_Device_LL_SetOption(handle, PROV_OPTION_LOG_TRACE, &traceOn);
-        Prov_Device_LL_SetOption(handle, OPTION_TRUSTED_CERT, certificates);
+        (void)prov_dev_security_init(hsm_type);
+        memset(&user_ctx, 0, sizeof(CLIENT_SAMPLE_INFO));
 
-        if (Prov_Device_LL_Register_Device(handle, register_device_callback, &user_ctx, registration_status_callback, &user_ctx) != PROV_DEVICE_RESULT_OK)
+        prov_dev_set_symmetric_key_info(registration_name, (usePrimaryKey) ? primary_key : secondary_key);
+
+        PROV_DEVICE_LL_HANDLE handle;
+        if ((handle = Prov_Device_LL_Create(global_prov_uri, id_scope, Prov_Device_MQTT_Protocol)) == NULL)
         {
-            ESP_LOGI(TAG, "failed calling Prov_Device_LL_Register_Device");
+            ESP_LOGI(TAG, "failed calling Prov_Device_LL_Create");
         }
         else
         {
-            do
-            {
-                Prov_Device_LL_DoWork(handle);
-                ThreadAPI_Sleep(10);
-            } while (user_ctx.registration_complete == 0);
+            Prov_Device_LL_SetOption(handle, PROV_OPTION_LOG_TRACE, &traceOn);
+            Prov_Device_LL_SetOption(handle, OPTION_TRUSTED_CERT, certificates);
 
-            success = (user_ctx.registration_complete == 1);
+            if (Prov_Device_LL_Register_Device(handle, register_device_callback, &user_ctx, registration_status_callback, &user_ctx) != PROV_DEVICE_RESULT_OK)
+            {
+                ESP_LOGI(TAG, "failed calling Prov_Device_LL_Register_Device");
+            }
+            else
+            {
+                do
+                {
+                    Prov_Device_LL_DoWork(handle);
+                    ThreadAPI_Sleep(10);
+                } while (user_ctx.registration_complete == 0);
+            }
+            Prov_Device_LL_Destroy(handle);
         }
-        Prov_Device_LL_Destroy(handle);
+
+        if (user_ctx.registration_complete != 1)
+        {
+            ThreadAPI_Sleep(10 * 1000);
+            ESP_LOGI(TAG, "Swapping key");
+            usePrimaryKey = !usePrimaryKey;
+            prov_dev_security_deinit();
+        }
     }
 
-    prov_dev_security_deinit();
-
-    return success;
+    return true;
 }
 
 void iothub_client_sample_mqtt_run(void)
@@ -168,7 +169,7 @@ void iothub_client_sample_mqtt_run(void)
     }
     else if (bootstrap_device())
     {
-        if ((iotHubClientHandle = IoTHubDeviceClient_LL_CreateFromConnectionString(conn_str, MQTT_Protocol)) == NULL)
+        if ((iotHubClientHandle = IoTHubDeviceClient_LL_CreateFromDeviceAuth(user_ctx.iothub_uri, user_ctx.device_id, MQTT_Protocol)) == NULL)
         {
             ESP_LOGE(TAG, "iotHubClientHandle is NULL!");
         }
@@ -190,6 +191,7 @@ void iothub_client_sample_mqtt_run(void)
 
             IoTHubDeviceClient_LL_Destroy(iotHubClientHandle);
         }
+        prov_dev_security_deinit();
         platform_deinit();
     }
 }
