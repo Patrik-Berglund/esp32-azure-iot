@@ -7,6 +7,8 @@ CFLAGS += -DUSE_LWIP_SOCKET_FOR_AZURE_IOT -Duse_amqp=OFF -Duse_http=OFF -DHSM_TY
 CFLAGS += -Wno-unused-function -Wno-missing-braces -Wno-missing-field-initializers
 
 COMPONENT_ADD_INCLUDEDIRS := \
+azure-iot-sdk-c/c-utility/deps/azure-macro-utils-c/inc \
+azure-iot-sdk-c/c-utility/deps/umock-c/inc \
 port \
 port/inc \
 azure-iot-sdk-c/certs \
@@ -36,7 +38,7 @@ azure-iot-sdk-c/c-utility/pal/lwip/sntp_lwip.o	\
 \
 \
 azure-iot-sdk-c/c-utility/src/http_proxy_io.o \
-azure-iot-sdk-c/c-utility/src/base32.o \
+azure-iot-sdk-c/c-utility/src/azure_base32.o \
 azure-iot-sdk-c/c-utility/adapters/agenttime.o	\
 \
 \

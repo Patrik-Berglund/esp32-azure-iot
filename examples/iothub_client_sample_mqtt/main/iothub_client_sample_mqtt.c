@@ -30,11 +30,11 @@ typedef struct CLIENT_SAMPLE_INFO_TAG
     int registration_complete;
 } CLIENT_SAMPLE_INFO;
 
-static const char *global_prov_uri = "";
-static const char *id_scope = "";
-static const char *registration_name = "";
-static const char *primary_key = "";
-static const char *secondary_key = "";
+#define EXAMPLE_IOTHUB_DPS_PROVISIONING_URI CONFIG_IOTHUB_DPS_PROVISIONING_URI
+#define EXAMPLE_IOTHUB_DPS_ID_SCOPE CONFIG_IOTHUB_DPS_ID_SCOPE
+#define EXAMPLE_IOTHUB_DPS_REGISTRATION_NAME CONFIG_IOTHUB_DPS_REGISTRATION_NAME
+#define EXAMPLE_IOTHUB_DPS_PRIMARY_KEY CONFIG_IOTHUB_DPS_PRIMARY_KEY
+#define EXAMPLE_IOTHUB_DPS_SECONDARY_KEY CONFIG_IOTHUB_DPS_SECONDARY_KEY
 
 static const char *TAG = "IOTHUB";
 static bool usePrimaryKey = true;
@@ -112,9 +112,9 @@ bool bootstrap_device(void)
     do
     {
         prov_dev_security_init(SECURE_DEVICE_TYPE_SYMMETRIC_KEY);
-        prov_dev_set_symmetric_key_info(registration_name, (usePrimaryKey) ? primary_key : secondary_key);
+        prov_dev_set_symmetric_key_info(EXAMPLE_IOTHUB_DPS_REGISTRATION_NAME, (usePrimaryKey) ? EXAMPLE_IOTHUB_DPS_PRIMARY_KEY : EXAMPLE_IOTHUB_DPS_SECONDARY_KEY);
 
-        if ((handle = Prov_Device_LL_Create(global_prov_uri, id_scope, Prov_Device_MQTT_Protocol)) == NULL)
+        if ((handle = Prov_Device_LL_Create(EXAMPLE_IOTHUB_DPS_PROVISIONING_URI, EXAMPLE_IOTHUB_DPS_ID_SCOPE, Prov_Device_MQTT_Protocol)) == NULL)
         {
             ESP_LOGI(TAG, "failed calling Prov_Device_LL_Create");
         }
