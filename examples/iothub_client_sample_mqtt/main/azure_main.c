@@ -38,7 +38,6 @@ static esp_err_t event_handler(void *ctx, system_event_t *event)
         ESP_LOGI(TAG, "SYSTEM_EVENT_STA_GOT_IP.");
         break;
     case SYSTEM_EVENT_STA_LOST_IP:
-        xEventGroupClearBits(wifi_event_group, CONNECTED_BIT);
         ESP_LOGI(TAG, "SYSTEM_EVENT_STA_LOST_IP.");
     case SYSTEM_EVENT_STA_DISCONNECTED:
         xEventGroupClearBits(wifi_event_group, CONNECTED_BIT);

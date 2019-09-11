@@ -3,6 +3,10 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include "esp_system.h"
+#include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 #include "iothub_device_client_ll.h"
 #include "iothub_client_options.h"
@@ -11,17 +15,37 @@
 #include "azure_c_shared_utility/crt_abstractions.h"
 #include "azure_c_shared_utility/platform.h"
 #include "azure_c_shared_utility/shared_util_options.h"
-#include "iothubtransportmqtt.h"
 #include "iothub_client_options.h"
-#include "esp_system.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "esp_log.h"
-
 #include "certs.h"
 #include "azure_prov_client/prov_device_ll_client.h"
 #include "azure_prov_client/prov_security_factory.h"
+
+#define SAMPLE_MQTT
+// #define SAMPLE_MQTT_OVER_WEBSOCKETS
+// #define SAMPLE_AMQP
+// #define SAMPLE_AMQP_OVER_WEBSOCKETS
+// #define SAMPLE_HTTP
+
+#ifdef SAMPLE_MQTT
+#include "iothubtransportmqtt.h"
 #include "azure_prov_client/prov_transport_mqtt_client.h"
+#endif // SAMPLE_MQTT
+#ifdef SAMPLE_MQTT_OVER_WEBSOCKETS
+#include "iothubtransportmqtt_websockets.h"
+#include "azure_prov_client/prov_transport_mqtt_ws_client.h"
+#endif // SAMPLE_MQTT_OVER_WEBSOCKETS
+#ifdef SAMPLE_AMQP
+#include "iothubtransportamqp.h"
+#include "azure_prov_client/prov_transport_amqp_client.h"
+#endif // SAMPLE_AMQP
+#ifdef SAMPLE_AMQP_OVER_WEBSOCKETS
+#include "iothubtransportamqp_websockets.h"
+#include "azure_prov_client/prov_transport_amqp_ws_client.h"
+#endif // SAMPLE_AMQP_OVER_WEBSOCKETS
+#ifdef SAMPLE_HTTP
+#include "iothubtransporthttp.h"
+#include "azure_prov_client/prov_transport_http_client.h"
+#endif // SAMPLE_HTTP
 
 typedef struct CLIENT_SAMPLE_INFO_TAG
 {
@@ -37,42 +61,14 @@ typedef struct CLIENT_SAMPLE_INFO_TAG
 #define EXAMPLE_IOTHUB_DPS_SECONDARY_KEY CONFIG_IOTHUB_DPS_SECONDARY_KEY
 
 static const char *TAG = "IOTHUB";
-static bool usePrimaryKey = true;
-CLIENT_SAMPLE_INFO user_ctx;
+static CLIENT_SAMPLE_INFO user_ctx;
 
 MU_DEFINE_ENUM_STRINGS(PROV_DEVICE_RESULT, PROV_DEVICE_RESULT_VALUE);
 MU_DEFINE_ENUM_STRINGS(PROV_DEVICE_REG_STATUS, PROV_DEVICE_REG_STATUS_VALUES);
 
 static void connection_status_callback(IOTHUB_CLIENT_CONNECTION_STATUS status, IOTHUB_CLIENT_CONNECTION_STATUS_REASON reason, void *userContextCallback)
 {
-    ESP_LOGI(TAG, "Connection Status Callback: status=%d reason=%d", status, reason);
-
-    switch (reason)
-    {
-    case IOTHUB_CLIENT_CONNECTION_OK:
-        ESP_LOGI(TAG, "IOTHUB_CLIENT_CONNECTION_OK");
-        break;
-    case IOTHUB_CLIENT_CONNECTION_EXPIRED_SAS_TOKEN:
-        ESP_LOGW(TAG, "IOTHUB_CLIENT_CONNECTION_EXPIRED_SAS_TOKEN");
-        break;
-    case IOTHUB_CLIENT_CONNECTION_DEVICE_DISABLED:
-        ESP_LOGW(TAG, "IOTHUB_CLIENT_CONNECTION_DEVICE_DISABLED");
-        break;
-    case IOTHUB_CLIENT_CONNECTION_BAD_CREDENTIAL:
-        ESP_LOGW(TAG, "IOTHUB_CLIENT_CONNECTION_BAD_CREDENTIAL");
-        break;
-    case IOTHUB_CLIENT_CONNECTION_RETRY_EXPIRED:
-        ESP_LOGW(TAG, "IOTHUB_CLIENT_CONNECTION_RETRY_EXPIRED");
-        break;
-    case IOTHUB_CLIENT_CONNECTION_NO_NETWORK:
-        ESP_LOGW(TAG, "IOTHUB_CLIENT_CONNECTION_NO_NETWORK");
-        break;
-    case IOTHUB_CLIENT_CONNECTION_COMMUNICATION_ERROR:
-        ESP_LOGW(TAG, "IOTHUB_CLIENT_CONNECTION_COMMUNICATION_ERROR");
-        break;
-    default:
-        ESP_LOGW(TAG, "UNKNOWN_REASON");
-    }
+    ESP_LOGI(TAG, "Connection Status Callback, Status: %s Reason: %s", MU_ENUM_TO_STRING(IOTHUB_CLIENT_CONNECTION_STATUS, status), MU_ENUM_TO_STRING(IOTHUB_CLIENT_CONNECTION_STATUS_REASON, reason));
 }
 
 static void register_device_callback(PROV_DEVICE_RESULT register_result, const char *iothub_uri, const char *device_id, void *user_context)
@@ -90,43 +86,62 @@ static void register_device_callback(PROV_DEVICE_RESULT register_result, const c
     }
     else
     {
-        ESP_LOGI(TAG, "Failure encountered on registration %s", MU_ENUM_TO_STRING(PROV_DEVICE_RESULT, register_result));
+        ESP_LOGW(TAG, "Failure encountered on registration %s", MU_ENUM_TO_STRING(PROV_DEVICE_RESULT, register_result));
         user_ctx->registration_complete = 2;
     }
 }
 
 static void registration_status_callback(PROV_DEVICE_REG_STATUS reg_status, void *user_context)
 {
-    (void)user_context;
     ESP_LOGI(TAG, "Provisioning Status: %s", MU_ENUM_TO_STRING(PROV_DEVICE_REG_STATUS, reg_status));
 }
 
-bool bootstrap_device(void)
+static void bootstrap_device(void)
 {
-    bool traceOn = true;
-    uint8_t timeout = 60;
     PROV_DEVICE_LL_HANDLE handle;
+    PROV_DEVICE_TRANSPORT_PROVIDER_FUNCTION prov_transport;
+    bool usePrimaryKey = true;
+    uint8_t timeout = 60;
 
-    memset(&user_ctx, 0, sizeof(CLIENT_SAMPLE_INFO));
+#ifdef SAMPLE_MQTT
+    prov_transport = Prov_Device_MQTT_Protocol;
+#endif // SAMPLE_MQTT
+#ifdef SAMPLE_MQTT_OVER_WEBSOCKETS
+    prov_transport = Prov_Device_MQTT_WS_Protocol;
+#endif // SAMPLE_MQTT_OVER_WEBSOCKETS
+#ifdef SAMPLE_AMQP
+    prov_transport = Prov_Device_AMQP_Protocol;
+#endif // SAMPLE_AMQP
+#ifdef SAMPLE_AMQP_OVER_WEBSOCKETS
+    prov_transport = Prov_Device_AMQP_WS_Protocol;
+#endif // SAMPLE_AMQP_OVER_WEBSOCKETS
+#ifdef SAMPLE_HTTP
+    prov_transport = Prov_Device_HTTP_Protocol;
+#endif // SAMPLE_HTTP
 
     do
     {
+        memset(&user_ctx, 0, sizeof(CLIENT_SAMPLE_INFO));
+
         prov_dev_security_init(SECURE_DEVICE_TYPE_SYMMETRIC_KEY);
         prov_dev_set_symmetric_key_info(EXAMPLE_IOTHUB_DPS_REGISTRATION_NAME, (usePrimaryKey) ? EXAMPLE_IOTHUB_DPS_PRIMARY_KEY : EXAMPLE_IOTHUB_DPS_SECONDARY_KEY);
 
-        if ((handle = Prov_Device_LL_Create(EXAMPLE_IOTHUB_DPS_PROVISIONING_URI, EXAMPLE_IOTHUB_DPS_ID_SCOPE, Prov_Device_MQTT_Protocol)) == NULL)
+        if ((handle = Prov_Device_LL_Create(EXAMPLE_IOTHUB_DPS_PROVISIONING_URI, EXAMPLE_IOTHUB_DPS_ID_SCOPE, prov_transport)) == NULL)
         {
-            ESP_LOGI(TAG, "failed calling Prov_Device_LL_Create");
+            ESP_LOGE(TAG, "failed calling Prov_Device_LL_Create");
         }
         else
         {
+#ifndef SAMPLE_HTTP
+            bool traceOn = true;
             Prov_Device_LL_SetOption(handle, PROV_OPTION_LOG_TRACE, &traceOn);
+#endif
             Prov_Device_LL_SetOption(handle, OPTION_TRUSTED_CERT, certificates);
             Prov_Device_LL_SetOption(handle, PROV_OPTION_TIMEOUT, &timeout);
 
             if (Prov_Device_LL_Register_Device(handle, register_device_callback, &user_ctx, registration_status_callback, &user_ctx) != PROV_DEVICE_RESULT_OK)
             {
-                ESP_LOGI(TAG, "failed calling Prov_Device_LL_Register_Device");
+                ESP_LOGE(TAG, "failed calling Prov_Device_LL_Register_Device");
             }
             else
             {
@@ -148,24 +163,40 @@ bool bootstrap_device(void)
 
             free(user_ctx.device_id);
             free(user_ctx.iothub_uri);
-            memset(&user_ctx, 0, sizeof(CLIENT_SAMPLE_INFO));
         }
     } while (user_ctx.registration_complete != 1);
-
-    return true;
 }
 
 void iothub_client_sample_mqtt_run(void)
 {
     IOTHUB_DEVICE_CLIENT_LL_HANDLE iotHubClientHandle;
+    IOTHUB_CLIENT_TRANSPORT_PROVIDER iothub_transport;
+
+#ifdef SAMPLE_MQTT
+    iothub_transport = MQTT_Protocol;
+#endif // SAMPLE_MQTT
+#ifdef SAMPLE_MQTT_OVER_WEBSOCKETS
+    iothub_transport = MQTT_WebSocket_Protocol;
+#endif // SAMPLE_MQTT_OVER_WEBSOCKETS
+#ifdef SAMPLE_AMQP
+    iothub_transport = AMQP_Protocol;
+#endif // SAMPLE_AMQP
+#ifdef SAMPLE_AMQP_OVER_WEBSOCKETS
+    iothub_transport = AMQP_Protocol_over_WebSocketsTls;
+#endif // SAMPLE_AMQP_OVER_WEBSOCKETS
+#ifdef SAMPLE_HTTP
+    iothub_transport = HTTP_Protocol;
+#endif // SAMPLE_HTTP
 
     if (platform_init() != 0)
     {
         ESP_LOGE(TAG, "Failed to initialize the platform.");
     }
-    else if (bootstrap_device())
+    else
     {
-        if ((iotHubClientHandle = IoTHubDeviceClient_LL_CreateFromDeviceAuth(user_ctx.iothub_uri, user_ctx.device_id, MQTT_Protocol)) == NULL)
+        bootstrap_device();
+
+        if ((iotHubClientHandle = IoTHubDeviceClient_LL_CreateFromDeviceAuth(user_ctx.iothub_uri, user_ctx.device_id, iothub_transport)) == NULL)
         {
             ESP_LOGE(TAG, "iotHubClientHandle is NULL!");
         }
@@ -175,10 +206,13 @@ void iothub_client_sample_mqtt_run(void)
         }
         else
         {
+#ifndef SAMPLE_HTTP
             bool traceOn = true;
             IoTHubDeviceClient_LL_SetOption(iotHubClientHandle, OPTION_LOG_TRACE, &traceOn);
+#endif
             IoTHubDeviceClient_LL_SetOption(iotHubClientHandle, OPTION_TRUSTED_CERT, certificates);
 
+            ESP_LOGI(TAG, "IoTHubDeviceClient_LL_DoWork started");
             do
             {
                 IoTHubDeviceClient_LL_DoWork(iotHubClientHandle);

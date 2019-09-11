@@ -8,11 +8,8 @@
 
 static const char *const ntpServer = "pool.ntp.org";
 
-/* Codes_SRS_PLATFORM_OPENSSL_COMPACT_30_004: [ The platform_init shall initialize the tlsio adapter. ] */
-/* Codes_SRS_PLATFORM_OPENSSL_COMPACT_30_005: [ The platform_init shall initialize the sntp client. ] */
 int platform_init(void)
 {
-    // SNTP_SetServerName logs any necessary errors
     if (SNTP_SetServerName(ntpServer) != 0)
     {
         LogError("Failed SNTP_SetServerName");
@@ -27,7 +24,6 @@ int platform_init(void)
     return 0;
 }
 
-/* Codes_SRS_PLATFORM_OPENSSL_COMPACT_30_008: [ The platform_get_default_tlsio shall return a set of tlsio functions provided by the OpenSSL micro tlsio implementation. ] */
 const IO_INTERFACE_DESCRIPTION *platform_get_default_tlsio(void)
 {
     return tlsio_mbedtls_get_interface_description();
@@ -35,17 +31,12 @@ const IO_INTERFACE_DESCRIPTION *platform_get_default_tlsio(void)
 
 STRING_HANDLE platform_get_platform_info(PLATFORM_INFO_OPTION options)
 {
-    // No applicable options, so ignoring parameter
     (void)options;
 
-    return STRING_construct("(openssl_compact)");
+    return STRING_construct("(esp_idf_mbedtls_berkeley)");
 }
 
-/* Codes_SRS_PLATFORM_OPENSSL_COMPACT_30_006: [ The platform_deinit shall deinitialize the sntp client. ] */
-/* Codes_SRS_PLATFORM_OPENSSL_COMPACT_30_007: [ The platform_deinit shall deinitialize the tlsio adapter. ] */
 void platform_deinit(void)
 {
     SNTP_Deinit();
-
-    // The tlsio adapter for this platform does not need (or support) deinitialization
 }
