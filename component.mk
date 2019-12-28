@@ -34,7 +34,6 @@ azure-iot-sdk-c/certs/certs.o \
 \
 \
 azure-iot-sdk-c/c-utility/pal/freertos/lock.o \
-azure-iot-sdk-c/c-utility/pal/dns_async.o \
 azure-iot-sdk-c/c-utility/pal/socket_async.o \
 azure-iot-sdk-c/c-utility/pal/freertos/threadapi.o \
 azure-iot-sdk-c/c-utility/pal/freertos/tickcounter.o \
@@ -52,6 +51,7 @@ port/src/socketio_berkeley.o	\
 azure-iot-sdk-c/c-utility/adapters/tlsio_mbedtls.o	\
 \
 \
+azure-iot-sdk-c/c-utility/src/dns_resolver_sync.o \
 azure-iot-sdk-c/c-utility/src/xlogging.o \
 azure-iot-sdk-c/c-utility/src/singlylinkedlist.o \
 azure-iot-sdk-c/c-utility/src/buffer.o \
