@@ -120,6 +120,7 @@ azure-iot-sdk-c/iothub_client/src/iothubtransport_amqp_twin_messenger.o \
 azure-iot-sdk-c/iothub_client/src/iothubtransportamqp_websockets.o \
 azure-iot-sdk-c/iothub_client/src/uamqp_messaging.o \
 azure-iot-sdk-c/iothub_client/src/message_queue.o \
+azure-iot-sdk-c/iothub_client/src/blob.o \
 \
 \
 azure-iot-sdk-c/umqtt/src/mqtt_client.o \
