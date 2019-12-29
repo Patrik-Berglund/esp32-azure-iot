@@ -11,18 +11,31 @@ config WIFI_PASSWORD
 	default "myssid"
 	help
 		WiFi password (WPA or WPA2) for the example to use.
-
 		Can be left blank if the network has no security set.
 
-config IOTHUB_CONNECTION_STRING
+config IOTHUB_DPS_PROVISIONING_URI
     string "IOT Hub Device Connection String"
-	default "HostName=<host_name>;DeviceId=<device_id>;SharedAccessKey=<device_key>"
+	default ""
 	help
-		String containing Hostname, Device Id & Device Key in the format:
-		
-		HostName=<host_name>;DeviceId=<device_id>;SharedAccessKey=<device_key>
-		HostName=<host_name>;DeviceId=<device_id>;SharedAccessSignature=<device_sas_token>
 
-		You can get this from the iothub-explorer CLI or the Azure Portal
+config IOTHUB_DPS_ID_SCOPE
+    string "IOT Hub Device Connection String"
+	default ""
+	help
+
+config IOTHUB_DPS_REGISTRATION_NAME
+    string "IOT Hub Device Connection String"
+	default ""
+	help
+
+config IOTHUB_DPS_PRIMARY_KEY
+	string "IOT Hub Device Connection String"
+	default ""
+	help
+
+config IOTHUB_DPS_SECONDARY_KEY
+	string "IOT Hub Device Connection String"
+	default ""
+	help
 
 endmenu
