@@ -8,7 +8,7 @@
 #include "esp_wifi.h"
 #include "esp_event_loop.h"
 #include "esp_log.h"
-#include "rom/rtc.h"
+#include "esp32/rom/rtc.h"
 
 #include "nvs_flash.h"
 #include "iothub_client_sample_mqtt.h"
@@ -39,6 +39,7 @@ static esp_err_t event_handler(void *ctx, system_event_t *event)
         break;
     case SYSTEM_EVENT_STA_LOST_IP:
         ESP_LOGI(TAG, "SYSTEM_EVENT_STA_LOST_IP.");
+        break;
     case SYSTEM_EVENT_STA_DISCONNECTED:
         xEventGroupClearBits(wifi_event_group, CONNECTED_BIT);
         ESP_LOGI(TAG, "SYSTEM_EVENT_STA_DISCONNECTED.");
