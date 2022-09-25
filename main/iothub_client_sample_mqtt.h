@@ -3,15 +3,7 @@
 
 #ifndef IOTHUB_CLIENT_SAMPLE_MQTT_H
 #define IOTHUB_CLIENT_SAMPLE_MQTT_H
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-	void iothub_client_sample_mqtt_run(void);
-
-#ifdef __cplusplus
-}
-#endif
+	
+void iothub_client_sample_mqtt_run(void);
 
 #endif /* IOTHUB_CLIENT_SAMPLE_MQTT_H */

@@ -132,10 +132,6 @@ static void bootstrap_device(void)
         }
         else
         {
-#ifndef SAMPLE_HTTP
-            bool traceOn = true;
-            Prov_Device_LL_SetOption(handle, PROV_OPTION_LOG_TRACE, &traceOn);
-#endif
             Prov_Device_LL_SetOption(handle, OPTION_TRUSTED_CERT, certificates);
             Prov_Device_LL_SetOption(handle, PROV_OPTION_TIMEOUT, &timeout);
 
@@ -188,8 +184,6 @@ void iothub_client_sample_mqtt_run(void)
     iothub_transport = HTTP_Protocol;
 #endif // SAMPLE_HTTP
 
-#define HELLO_WORLD "Hello World from IoTHubClient_LL_UploadToBlob"
-
     if (platform_init() != 0)
     {
         ESP_LOGE(TAG, "Failed to initialize the platform.");
@@ -208,43 +202,19 @@ void iothub_client_sample_mqtt_run(void)
         }
         else
         {
-#ifndef SAMPLE_HTTP
-            bool traceOn = true;
-            IoTHubDeviceClient_LL_SetOption(iotHubClientHandle, OPTION_LOG_TRACE, &traceOn);
-#endif
             IoTHubDeviceClient_LL_SetOption(iotHubClientHandle, OPTION_TRUSTED_CERT, certificates);
 
-            int32_t i = 0;
             ESP_LOGI(TAG, "IoTHubDeviceClient_LL_DoWork started");
-            do
+            while (true)
             {
                 IoTHubDeviceClient_LL_DoWork(iotHubClientHandle);
 
-                if (i == 100)
-                {
-                    if (IoTHubDeviceClient_LL_UploadToBlob(iotHubClientHandle, "hello_world.txt", (const unsigned char *)HELLO_WORLD, sizeof(HELLO_WORLD) - 1) != IOTHUB_CLIENT_OK)
-                    {
-                        ESP_LOGE(TAG, "hello world failed to upload");
-                    }
-                    else
-                    {
-                        ESP_LOGI(TAG, "hello world has been created");
-                    }
-                }
-
                 ThreadAPI_Sleep(10);
-                i++;
-            } while (true);
+            }
 
             IoTHubDeviceClient_LL_Destroy(iotHubClientHandle);
         }
         prov_dev_security_deinit();
         platform_deinit();
     }
-}
-
-int main(void)
-{
-    iothub_client_sample_mqtt_run();
-    return 0;
 }

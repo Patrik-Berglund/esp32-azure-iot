@@ -1,0 +1,31 @@
+menu "Example Configuration"
+
+config WIFI_SSID
+    string "WiFi SSID"
+	default "myssid"
+
+config WIFI_PASSWORD
+    string "WiFi Password"
+	default "myssid"
+
+config IOTHUB_DPS_PROVISIONING_URI
+    string "IOTHUB_DPS_PROVISIONING_URI"
+	default ""
+
+config IOTHUB_DPS_ID_SCOPE
+    string "IOTHUB_DPS_ID_SCOPE"
+	default ""
+
+config IOTHUB_DPS_REGISTRATION_NAME
+    string "IOTHUB_DPS_REGISTRATION_NAME"
+	default ""
+
+config IOTHUB_DPS_PRIMARY_KEY
+	string "IOTHUB_DPS_PRIMARY_KEY"
+	default ""
+
+config IOTHUB_DPS_SECONDARY_KEY
+	string "IOTHUB_DPS_SECONDARY_KEY"
+	default ""
+
+endmenu
