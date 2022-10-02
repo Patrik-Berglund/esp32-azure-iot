@@ -5,12 +5,11 @@
 set (AZURE_IOT_SDK "${CMAKE_CURRENT_LIST_DIR}/../azure-iot-sdk-c")
 
 set (COMPONENT_ADD_INCLUDEDIRS
+    "inc"
     "${AZURE_IOT_SDK}/c-utility/deps/azure-macro-utils-c/inc"
     "${AZURE_IOT_SDK}/c-utility/deps/umock-c/inc"
-    "inc"
     "${AZURE_IOT_SDK}/certs"
     "${AZURE_IOT_SDK}/c-utility/inc"
-    "${AZURE_IOT_SDK}/c-utility/inc/azure_c_shared_utility"
     "${AZURE_IOT_SDK}/c-utility/pal/inc"
     "${AZURE_IOT_SDK}/c-utility/pal/freertos"
     "${AZURE_IOT_SDK}/c-utility/pal/generic"
@@ -28,6 +27,9 @@ set (COMPONENT_ADD_INCLUDEDIRS
 	)
 
 set (COMPONENT_SRCS
+    "src/platform_esp_idf.c"
+    "src/mbed_wait_api.c"
+    "src/socketio_berkeley.c"
     "${AZURE_IOT_SDK}/certs/certs.c"
     "${AZURE_IOT_SDK}/c-utility/pal/freertos/lock.c"
     "${AZURE_IOT_SDK}/c-utility/pal/socket_async.c"
@@ -37,9 +39,6 @@ set (COMPONENT_SRCS
     "${AZURE_IOT_SDK}/c-utility/adapters/agenttime.c"
     "${AZURE_IOT_SDK}/c-utility/adapters/uniqueid_stub.c"
     "${AZURE_IOT_SDK}/c-utility/adapters/httpapi_compact.c"
-    "src/platform_esp_idf.c"
-    "src/mbed_wait_api.c"
-    "src/socketio_berkeley.c"
     "${AZURE_IOT_SDK}/c-utility/adapters/tlsio_mbedtls.c"
     "${AZURE_IOT_SDK}/c-utility/src/dns_resolver_sync.c"
     "${AZURE_IOT_SDK}/c-utility/src/xlogging.c"
@@ -154,20 +153,11 @@ set (COMPONENT_SRCS
     "${AZURE_IOT_SDK}/provisioning_client/adapters/hsm_client_key.c"
 	)
 
-if (CONFIG_DEVICE_COMMON_NAME)
-	list (APPEND COMPONENT_SRCS "${AZURE_IOT_SDK}/provisioning_client/src/iothub_auth_client.c")
-endif()
-
 set (COMPONENT_SUBMODULES "${AZURE_IOT_SDK}")
 
 set(COMPONENT_PRIV_REQUIRES "mbedtls main")
 
 register_component()
-
-set_source_files_properties(
-    ${AZURE_IOT_SDK}/iothub_client/src/iothubtransport_mqtt_common.c
-    PROPERTIES COMPILE_FLAGS
-    -Wno-maybe-uninitialized)
 
 component_compile_options (
 	-Wno-unused-function
@@ -192,10 +182,3 @@ component_compile_definitions (
     HSM_TYPE_SYMM_KEY
     SET_TRUSTED_CERT_IN_SAMPLES
 )
-
-if (CONFIG_DEVICE_COMMON_NAME)
-    add_definitions(-DUSE_LWIP_SOCKET_FOR_AZURE_IOT)
-	add_definitions(-DUSE_PROV_MODULE)
-    add_definitions(-DHSM_TYPE_SYMM_KEY)
-    add_definitions(-DSET_TRUSTED_CERT_IN_SAMPLES)
-endif()
