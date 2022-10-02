@@ -184,6 +184,10 @@ void iothub_client_sample_mqtt_run(void)
     iothub_transport = HTTP_Protocol;
 #endif // SAMPLE_HTTP
 
+#define HELLO_WORLD "Hello World from IoTHubClient_LL_UploadToBlob"
+    bool fileUploadStarted = false;
+
+
     if (platform_init() != 0)
     {
         ESP_LOGE(TAG, "Failed to initialize the platform.");
@@ -208,6 +212,19 @@ void iothub_client_sample_mqtt_run(void)
             while (true)
             {
                 IoTHubDeviceClient_LL_DoWork(iotHubClientHandle);
+
+                if (!fileUploadStarted)
+                {
+                    if (IoTHubDeviceClient_LL_UploadToBlob(iotHubClientHandle, "hello_world.txt", (const unsigned char *)HELLO_WORLD, sizeof(HELLO_WORLD) - 1) != IOTHUB_CLIENT_OK)
+                    {
+                        ESP_LOGE(TAG, "hello world failed to upload");
+                    }
+                    else
+                    {
+                        ESP_LOGI(TAG, "hello world has been created");
+                    }
+                    fileUploadStarted = true;
+                }
 
                 ThreadAPI_Sleep(10);
             }
